@@ -23,6 +23,12 @@ NUPAT_DISABLE_FINBERT=1
 FRONTEND_URL=https://YOUR_FRONTEND_URL
 ```
 
+For the current Vercel deployment:
+
+```bash
+FRONTEND_URL=https://ngx-intelligence.vercel.app
+```
+
 If you use Railway Postgres, set:
 
 ```bash
@@ -62,4 +68,3 @@ Frontend:
 /app/stocks
 /app/markets
 ```
-
