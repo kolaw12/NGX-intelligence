@@ -18,7 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.routers import account, admin, auth, engine, market, news, predict, recommendations, stocks, user_data
-from app.db.database import Base, engine, init_dev_database
+from app.db.database import Base, engine as db_engine, init_dev_database
 from app.db import models  # noqa: F401 - register ORM tables for create_all.
 from app.services.backend_model_config import get_backend_model_config
 from app.services.xgboost_predictor import warmup_xgboost
@@ -121,7 +121,7 @@ def create_app() -> FastAPI:
             init_dev_database()
         elif os.getenv("AUTO_CREATE_TABLES", "1").strip().lower() in {"1", "true", "yes"}:
             logger.warning("AUTO_CREATE_TABLES enabled; creating any missing production tables")
-            Base.metadata.create_all(bind=engine)
+            Base.metadata.create_all(bind=db_engine)
         try:
             metadata = warmup_xgboost()
             config = get_backend_model_config()
