@@ -14,6 +14,11 @@ numpy>=2.4.0
 pyarrow>=24.0.0
 python-dateutil>=2.9.0
 
+# Model snapshot export
+joblib>=1.4.0
+scikit-learn==1.6.1
+xgboost==3.2.0
+
 # Config & utilities
 python-dotenv>=1.0.0
 pyyaml>=6.0.0
