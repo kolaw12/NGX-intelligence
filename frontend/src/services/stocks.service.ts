@@ -42,19 +42,42 @@ export const stocksService = {
   },
 
   getOHLC: async (symbol: string, range: Range): Promise<OHLC[]> => {
-    return http.get<OHLC[]>(`/stocks/${symbol}/ohlc?range=${range}`);
+    return http.get<OHLC[]>(`/stocks/${symbol}/ohlc?range=${range}`).catch(() => []);
   },
 
   getLine: async (symbol: string, range: Range): Promise<SeriesPoint[]> => {
-    return http.get<SeriesPoint[]>(`/stocks/${symbol}/line?range=${range}`);
+    return http.get<SeriesPoint[]>(`/stocks/${symbol}/line?range=${range}`).catch(() => []);
   },
 
   getFundamentals: async (symbol: string): Promise<FundamentalsRow[]> => {
-    return http.get<FundamentalsRow[]>(`/stocks/${symbol}/fundamentals`);
+    const stock = bySymbol(symbol);
+    if (!stock) return [];
+    return [
+      { metric: "Latest close (market snapshot)", fy2021: "Unavailable", fy2022: "Unavailable", fy2023: "Unavailable", ttm: stock.price },
+      { metric: "Latest daily change", fy2021: "Unavailable", fy2022: "Unavailable", fy2023: "Unavailable", ttm: `${stock.changePct.toFixed(2)}%` },
+      { metric: "Latest volume", fy2021: "Unavailable", fy2022: "Unavailable", fy2023: "Unavailable", ttm: stock.volume.toLocaleString() },
+      { metric: "52-week high", fy2021: "Unavailable", fy2022: "Unavailable", fy2023: "Unavailable", ttm: stock.high52w },
+      { metric: "52-week low", fy2021: "Unavailable", fy2022: "Unavailable", fy2023: "Unavailable", ttm: stock.low52w },
+      { metric: "Risk score", fy2021: "Unavailable", fy2022: "Unavailable", fy2023: "Unavailable", ttm: stock.riskScore },
+    ];
   },
 
   getPeers: async (symbol: string): Promise<PeerStock[]> => {
-    return http.get<PeerStock[]>(`/stocks/${symbol}/peers`);
+    const stock = bySymbol(symbol);
+    if (!stock) return [];
+    return fallbackStocks
+      .filter((peer) => peer.sectorSlug === stock.sectorSlug && peer.symbol !== stock.symbol)
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 12)
+      .map((peer) => ({
+        symbol: peer.symbol,
+        name: peer.name,
+        price: peer.price,
+        changePct: peer.changePct,
+        marketCap: peer.marketCap,
+        pe: peer.pe,
+        aiOutlook: peer.aiOutlook,
+      }));
   },
 
   topGainers: async (limit = 5): Promise<Stock[]> => {
