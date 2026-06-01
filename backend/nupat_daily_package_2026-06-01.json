@@ -1,0 +1,111 @@
+{
+    "date": "2026-06-01",
+    "generated_at": "2026-06-01 11:13:10",
+    "total_articles": 16,
+    "stock_sentiments": [
+        {
+            "ticker": "ABL",
+            "sentiment_score": 0.6,
+            "signal": "POSITIVE",
+            "article_count": 1
+        }
+    ],
+    "theme_sentiments": [],
+    "market_sentiment": {
+        "score": -0.1412,
+        "signal": "NEUTRAL",
+        "article_count": 15
+    },
+    "macro_indicators": {
+        "cfa_ngn_rate": {
+            "value": 2.43,
+            "unit": "NGN/CFA",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "danish_krona_ngn_rate": {
+            "value": 213.34,
+            "unit": "NGN/DANISH_KRONA",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "euro_ngn_rate": {
+            "value": 1594.49,
+            "unit": "NGN/EURO",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "japanese_yen_ngn_rate": {
+            "value": 8.64,
+            "unit": "NGN/JAPANESE_YEN",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "poeso_ngn_rate": {
+            "value": 27.62,
+            "unit": "NGN/POESO",
+            "date": "2009-07-01",
+            "source": "cbn"
+        },
+        "pounds_sterling_ngn_rate": {
+            "value": 1829.94,
+            "unit": "NGN/POUNDS_STERLING",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "riyal_ngn_rate": {
+            "value": 365.21,
+            "unit": "NGN/RIYAL",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "sdr_ngn_rate": {
+            "value": 1882.27,
+            "unit": "NGN/SDR",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "south_african_rand_ngn_rate": {
+            "value": 82.34,
+            "unit": "NGN/SOUTH_AFRICAN_RAND",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "swiss_franc_ngn_rate": {
+            "value": 1743.91,
+            "unit": "NGN/SWISS_FRANC",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "uae_dirham_ngn_rate": {
+            "value": 373.11,
+            "unit": "NGN/UAE_DIRHAM",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "us_dollar_ngn_rate": {
+            "value": 1370.54,
+            "unit": "NGN/US_DOLLAR",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "waua_ngn_rate": {
+            "value": 1879.88,
+            "unit": "NGN/WAUA",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "yuan_renminbi_ngn_rate": {
+            "value": 201.24,
+            "unit": "NGN/YUAN_RENMINBI",
+            "date": "2026-05-15",
+            "source": "cbn"
+        },
+        "brent_oil_usd": {
+            "value": 109.26,
+            "unit": "USD/barrel",
+            "date": "2026-05-15",
+            "source": "yahoo"
+        }
+    }
+}

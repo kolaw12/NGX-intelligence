@@ -1,0 +1,55 @@
+{
+    "date": "2026-05-20",
+    "generated_at": "2026-05-20 10:37:21",
+    "total_articles": 17,
+    "stock_sentiments": [
+        {
+            "ticker": "GTB",
+            "sentiment_score": 0.8,
+            "signal": "POSITIVE",
+            "article_count": 2
+        },
+        {
+            "ticker": "ABL",
+            "sentiment_score": 0.6,
+            "signal": "POSITIVE",
+            "article_count": 1
+        },
+        {
+            "ticker": "UBA",
+            "sentiment_score": 0.6,
+            "signal": "POSITIVE",
+            "article_count": 1
+        },
+        {
+            "ticker": "FID",
+            "sentiment_score": 0.6,
+            "signal": "POSITIVE",
+            "article_count": 1
+        },
+        {
+            "ticker": "ZEN",
+            "sentiment_score": 0.3006,
+            "signal": "NEUTRAL",
+            "article_count": 3
+        },
+        {
+            "ticker": "MTN",
+            "sentiment_score": 0.0334,
+            "signal": "NEUTRAL",
+            "article_count": 3
+        },
+        {
+            "ticker": "DANGCEM",
+            "sentiment_score": -0.1924,
+            "signal": "NEUTRAL",
+            "article_count": 2
+        }
+    ],
+    "market_sentiment": {
+        "score": -0.1594,
+        "signal": "NEUTRAL",
+        "article_count": 4
+    },
+    "macro_indicators": {}
+}

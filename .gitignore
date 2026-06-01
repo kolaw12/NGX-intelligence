@@ -1,0 +1,34 @@
+# Local secrets
+.env
+.env.local
+.env.*.local
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+.vite_logs/
+.vercel/
+
+# Runtime artifacts
+*.db
+*.dev.log
+*.log
+.api_logs/
+.streamlit_logs/
+data/output/raw/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+

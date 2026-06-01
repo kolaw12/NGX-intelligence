@@ -1,0 +1,42 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+Bigquery-credentials/
+
+# Runtime artifacts
+data/logs/
+data/.killswitch
+*.db
+*.dev.log
+.api_logs/
+.streamlit_logs/
+models/model_signal_snapshot.json
+models/ai_insights_snapshot.json
+
+# Raw HTML cache (regenerable, large, operator-only)
+data/output/raw/
+
+# Ad-hoc inspection files
+*_check.csv
+*_check.xlsx
+
+# Nested project sentinel — should never appear inside itself
+ai-stock-broker-backend/
+
+# dbt files not needed for commit
+dbt/target/*
+dbt-run.log
+logs/*
+dbt/logs/dbt.log
+dbt/dbt_packages/*
+
+# Ignore generated processed output
+data/output/processed/corporate_actions/
+data/output/processed/fundamentals/
+data/output/processed/macro/
+data/output/processed/news/articles/source=businessday/year=2026/articles.parquet
+data/output/processed/news/daily_sentiment_summary.parquet
