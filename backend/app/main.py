@@ -15,9 +15,11 @@ from fastapi import Request
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 
 from app.routers import account, admin, auth, engine, market, news, predict, recommendations, stocks, user_data
-from app.db.database import init_dev_database
+from app.db.database import Base, engine, init_dev_database
+from app.db import models  # noqa: F401 - register ORM tables for create_all.
 from app.services.backend_model_config import get_backend_model_config
 from app.services.xgboost_predictor import warmup_xgboost
 
@@ -25,6 +27,14 @@ load_dotenv()
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
+
+
+def _origin_allowed(origin: str | None, allowed_origins: list[str]) -> bool:
+    """Return whether a browser origin is allowed by explicit or Vercel rules."""
+
+    if not origin:
+        return False
+    return origin in allowed_origins or (origin.startswith("https://") and origin.endswith(".vercel.app"))
 
 
 def create_app() -> FastAPI:
@@ -54,6 +64,18 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception):
+        """Return CORS-safe JSON for unexpected backend errors."""
+
+        logger.exception("Unhandled API error on %s %s: %s", request.method, request.url.path, exc)
+        response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+        origin = request.headers.get("origin")
+        if _origin_allowed(origin, allowed_origins):
+            response.headers["Access-Control-Allow-Origin"] = origin or ""
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
 
     @app.middleware("http")
     async def _request_timing(request: Request, call_next):
@@ -97,6 +119,9 @@ def create_app() -> FastAPI:
         env = os.getenv("ENV", os.getenv("APP_ENV", "development")).lower()
         if env in {"development", "test", "testing"}:
             init_dev_database()
+        elif os.getenv("AUTO_CREATE_TABLES", "1").strip().lower() in {"1", "true", "yes"}:
+            logger.warning("AUTO_CREATE_TABLES enabled; creating any missing production tables")
+            Base.metadata.create_all(bind=engine)
         try:
             metadata = warmup_xgboost()
             config = get_backend_model_config()
