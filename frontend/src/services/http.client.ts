@@ -24,6 +24,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new HttpError(text || `Request failed (${res.status})`, res.status);
   }
   if (res.status === 204) return undefined as T;
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new HttpError(`Expected JSON response but received ${contentType || "unknown content type"}`, res.status);
+  }
   return (await res.json()) as T;
 }
 

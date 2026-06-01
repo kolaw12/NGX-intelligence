@@ -1,12 +1,16 @@
 import type { Sector } from "@/types/sector";
-import { http } from "./http.client";
+import sectorSnapshot from "@/data/sectors.snapshot.json";
+
+const fallbackSectors = sectorSnapshot as Sector[];
 
 export const sectorsService = {
   list: async (): Promise<Sector[]> => {
-    return http.get<Sector[]>("/sectors");
+    return fallbackSectors;
   },
 
   getBySlug: async (slug: string): Promise<Sector> => {
-    return http.get<Sector>(`/sectors/${slug}`);
+    const sector = fallbackSectors.find((item) => item.slug === slug);
+    if (!sector) throw new Error(`Sector not found: ${slug}`);
+    return sector;
   },
 };

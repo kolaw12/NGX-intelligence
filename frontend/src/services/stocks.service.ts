@@ -1,18 +1,44 @@
 import type { Stock, StockDetail, FundamentalsRow, PeerStock } from "@/types/stock";
 import type { OHLC, Range, SeriesPoint } from "@/types/common";
 import { http } from "./http.client";
+import stockSnapshot from "@/data/stocks.snapshot.json";
+
+const fallbackStocks = stockSnapshot as Stock[];
+
+function bySymbol(symbol: string) {
+  return fallbackStocks.find((stock) => stock.symbol.toUpperCase() === symbol.toUpperCase());
+}
+
+function sortedFallback(sorter: (a: Stock, b: Stock) => number, limit: number) {
+  return [...fallbackStocks].sort(sorter).slice(0, limit);
+}
 
 export const stocksService = {
   list: async (): Promise<Stock[]> => {
-    return http.get<Stock[]>("/stocks");
+    return fallbackStocks;
   },
 
   getBySymbol: async (symbol: string): Promise<StockDetail> => {
-    return http.get<StockDetail>(`/stocks/${symbol}`);
+    const stock = bySymbol(symbol);
+    if (!stock) throw new Error(`Ticker not found: ${symbol}`);
+    return {
+      ...stock,
+      description: `${stock.name} is listed on the Nigerian Exchange and tracked from the bundled NGX Intelligence market snapshot.`,
+      founded: null,
+      headquarters: null,
+      employees: null,
+      website: null,
+      ceo: null,
+      industry: stock.sector,
+      exchange: "NGX",
+      fundamentalsSource: "bundled snapshot",
+      ohlc: [],
+      intradayLine: [],
+    };
   },
 
   getBySector: async (slug: string): Promise<Stock[]> => {
-    return http.get<Stock[]>(`/stocks?sector=${slug}`);
+    return fallbackStocks.filter((stock) => stock.sectorSlug === slug);
   },
 
   getOHLC: async (symbol: string, range: Range): Promise<OHLC[]> => {
@@ -32,14 +58,14 @@ export const stocksService = {
   },
 
   topGainers: async (limit = 5): Promise<Stock[]> => {
-    return http.get<Stock[]>(`/stocks/top-gainers?limit=${limit}`);
+    return sortedFallback((a, b) => b.changePct - a.changePct, limit);
   },
 
   topLosers: async (limit = 5): Promise<Stock[]> => {
-    return http.get<Stock[]>(`/stocks/top-losers?limit=${limit}`);
+    return sortedFallback((a, b) => a.changePct - b.changePct, limit);
   },
 
   mostActive: async (limit = 5): Promise<Stock[]> => {
-    return http.get<Stock[]>(`/stocks/most-active?limit=${limit}`);
+    return sortedFallback((a, b) => b.volume - a.volume, limit);
   },
 };
