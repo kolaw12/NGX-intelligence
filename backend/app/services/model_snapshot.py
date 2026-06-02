@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import json
+import os
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -86,6 +87,9 @@ def get_model_signal_snapshot() -> dict[str, ModelSignal]:
     """
 
     stored_snapshot = _load_stored_snapshot()
+    if stored_snapshot and _is_production():
+        logger.info("Using packaged model signal snapshot in production")
+        return stored_snapshot
     if stored_snapshot and not _snapshot_is_stale():
         return stored_snapshot
     if stored_snapshot:
@@ -204,6 +208,11 @@ def _snapshot_is_stale() -> bool:
         if source.exists() and source.stat().st_mtime > snapshot_mtime:
             return True
     return False
+
+
+def _is_production() -> bool:
+    env = os.getenv("ENV", os.getenv("APP_ENV", "development")).lower()
+    return env not in {"development", "dev", "test", "testing", "local"}
 
 
 def _snapshot_risk_score(

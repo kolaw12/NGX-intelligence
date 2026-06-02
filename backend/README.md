@@ -257,6 +257,10 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+`requirements.txt` intentionally installs the lightweight hosted API stack.
+Use `requirements-full.txt` only for local data/NLP work that needs the heavier
+Torch/Transformers/SHAP toolchain.
+
 Start the API:
 
 ```bash

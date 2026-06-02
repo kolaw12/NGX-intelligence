@@ -20,6 +20,17 @@ railway domain
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
+## Build command
+
+Use the lightweight web dependencies:
+
+```bash
+python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+```
+
+Do not use `requirements-full.txt` on the hosted API; it includes the heavy
+local data/NLP stack and can exceed small Render instance memory.
+
 ## Required environment variables
 
 ```bash
@@ -30,6 +41,10 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/ngx_ai
 FRONTEND_URL=https://YOUR_FRONTEND_URL
 NUPAT_DISABLE_FINBERT=1
 AUTO_CREATE_TABLES=1
+WARMUP_XGBOOST=0
+WEB_CONCURRENCY=1
+OMP_NUM_THREADS=1
+MALLOC_ARENA_MAX=2
 ```
 
 Use `FRONTEND_URLS` for multiple allowed frontend origins:

@@ -121,8 +121,47 @@ def get_ticker_prices(ticker: str) -> pd.DataFrame:
 def get_latest_by_ticker() -> pd.DataFrame:
     """Return the latest price row for every ticker."""
 
+    latest_from_files = _latest_by_ticker_from_partitioned_files()
+    if not latest_from_files.empty:
+        return latest_from_files
     prices = load_prices()
     return prices.sort_values(["ticker", "date"]).groupby("ticker", as_index=False).tail(1).reset_index(drop=True)
+
+
+@lru_cache(maxsize=1)
+def _latest_by_ticker_from_partitioned_files() -> pd.DataFrame:
+    """Return latest rows without holding the consolidated parquet in memory."""
+
+    if not HISTORICAL_PRICE_DIR.exists():
+        return pd.DataFrame()
+    rows: list[pd.DataFrame] = []
+    for path in HISTORICAL_PRICE_DIR.glob("*.parquet"):
+        if path.name.startswith("_") or path.stat().st_size <= 0:
+            continue
+        try:
+            frame = pd.read_parquet(path)
+            if frame.empty:
+                continue
+            frame.columns = [str(column).strip().lower() for column in frame.columns]
+            if "date" not in frame.columns or "close" not in frame.columns:
+                continue
+            frame["ticker"] = path.stem.upper()
+            frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+            frame = frame.dropna(subset=["date", "close"]).sort_values("date").tail(1)
+            if not frame.empty:
+                rows.append(frame)
+        except Exception as exc:
+            logger.warning("Skipping latest-row load for %s: %s", path, exc)
+    if not rows:
+        return pd.DataFrame()
+    latest = pd.concat(rows, ignore_index=True)
+    for column in ["pclose", "high", "low", "close", "volume", "change"]:
+        if column not in latest.columns:
+            latest[column] = 0.0
+        latest[column] = pd.to_numeric(latest[column], errors="coerce")
+    latest["ticker"] = latest["ticker"].astype(str).str.upper().str.strip()
+    logger.info("Loaded %s latest price rows from partitioned files", len(latest))
+    return latest.sort_values("ticker").reset_index(drop=True)
 
 
 def get_ticker_metadata(ticker: str) -> dict[str, object]:

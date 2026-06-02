@@ -123,18 +123,21 @@ def create_app() -> FastAPI:
         elif os.getenv("AUTO_CREATE_TABLES", "1").strip().lower() in {"1", "true", "yes"}:
             logger.warning("AUTO_CREATE_TABLES enabled; creating any missing production tables")
             Base.metadata.create_all(bind=db_engine)
-        try:
-            metadata = warmup_xgboost()
-            config = get_backend_model_config()
-            logger.info(
-                "XGBoost ready: model=%s feature_list=%s feature_count=%s use_lstm=%s",
-                metadata["model"],
-                metadata["feature_list"],
-                metadata["feature_count"],
-                config.get("use_lstm", False),
-            )
-        except Exception as exc:
-            logger.error("XGBoost startup warmup failed: %s", exc)
+        if os.getenv("WARMUP_XGBOOST", "0").strip().lower() in {"1", "true", "yes"}:
+            try:
+                metadata = warmup_xgboost()
+                config = get_backend_model_config()
+                logger.info(
+                    "XGBoost ready: model=%s feature_list=%s feature_count=%s use_lstm=%s",
+                    metadata["model"],
+                    metadata["feature_list"],
+                    metadata["feature_count"],
+                    config.get("use_lstm", False),
+                )
+            except Exception as exc:
+                logger.error("XGBoost startup warmup failed: %s", exc)
+        else:
+            logger.info("Skipping XGBoost startup warmup; model loads lazily on first model request")
 
     return app
 
