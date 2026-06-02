@@ -35,6 +35,26 @@ export default function Settings() {
   const modelStatus = useModelStatus();
   const engineHealth = useEngineHealth();
   const sentimentDiagnostics = useSentimentDiagnostics();
+  const fundamentalsCheck = engineHealth.data?.checks.fundamentals_service;
+  const fundamentalsSource = String(fundamentalsCheck?.source ?? "unavailable");
+  const fundamentalsRows = Number(fundamentalsCheck?.fundamentalsRows ?? 0);
+  const profileRows = Number(fundamentalsCheck?.profileRows ?? 0);
+  const fundamentalsLabel =
+    fundamentalsSource === "fundamentals" ? "Loaded" : fundamentalsSource === "market_data_fallback" ? "Fallback" : fundamentalsSource === "company_profiles" ? "Profiles" : "Unavailable";
+  const fundamentalsVariant =
+    fundamentalsSource === "fundamentals" || fundamentalsSource === "company_profiles"
+      ? "success"
+      : fundamentalsSource === "market_data_fallback"
+        ? "warning"
+        : "danger";
+  const fundamentalsDescription =
+    fundamentalsSource === "fundamentals"
+      ? `${fundamentalsRows} filing rows`
+      : fundamentalsSource === "company_profiles"
+        ? `${profileRows} company profiles loaded`
+        : fundamentalsSource === "market_data_fallback"
+          ? "Market-data metrics available; real filings export not found."
+          : "No fundamentals or market-data fallback is available.";
   const settings = useQuery({
     queryKey: ["profile", "settings"],
     queryFn: authService.getSettings,
@@ -130,15 +150,9 @@ export default function Settings() {
           <div className="rounded-lg border border-border bg-surface-elevated/40 p-4">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-semibold text-foreground">Fundamentals</p>
-              <Badge variant={engineHealth.data?.checks.fundamentals_service?.ok ? "success" : "warning"}>
-                {engineHealth.data?.checks.fundamentals_service?.ok ? "Loaded" : "Unavailable"}
-              </Badge>
+              <Badge variant={fundamentalsVariant}>{fundamentalsLabel}</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {engineHealth.data?.checks.fundamentals_service?.ok
-                ? `${String(engineHealth.data.checks.fundamentals_service.fundamentalsRows ?? 0)} rows`
-                : "No real fundamentals export is present yet."}
-            </p>
+            <p className="text-xs text-muted-foreground">{fundamentalsDescription}</p>
           </div>
           <div className="rounded-lg border border-border bg-surface-elevated/40 p-4">
             <div className="mb-2 flex items-center justify-between">

@@ -91,3 +91,16 @@ def init_dev_database() -> None:
 
     logger.warning("Creating database tables through Base.metadata for local development")
     Base.metadata.create_all(bind=engine)
+
+
+def ensure_database_tables() -> None:
+    """Create missing ORM tables when the deployment explicitly allows it."""
+
+    env = os.getenv("ENV", os.getenv("APP_ENV", "development")).lower()
+    if env in {"development", "test", "testing"}:
+        init_dev_database()
+        return
+
+    if os.getenv("AUTO_CREATE_TABLES", "1").strip().lower() in {"1", "true", "yes"}:
+        logger.warning("AUTO_CREATE_TABLES enabled; creating any missing tables")
+        Base.metadata.create_all(bind=engine)

@@ -93,6 +93,7 @@ def create_app() -> FastAPI:
     app.include_router(stocks.router)
     app.include_router(recommendations.router)
     app.include_router(news.router)
+    app.include_router(engine.router)
     app.include_router(engine.router, prefix="/api")
     app.include_router(predict.router, prefix="/api")
     app.include_router(auth.router)

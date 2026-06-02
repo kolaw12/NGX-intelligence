@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.db.crud import canonical_ticker
+from app.db.crud import PRICE_DATA_PATH, canonical_ticker
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +78,21 @@ def fundamentals_status() -> dict[str, Any]:
 
     loaded = load_fundamentals()
     profile = load_company_profiles()
+    has_market_fallback = PRICE_DATA_PATH.exists() and PRICE_DATA_PATH.stat().st_size > 0
+    if not loaded.empty:
+        source = "fundamentals"
+    elif not profile.empty:
+        source = "company_profiles"
+    elif has_market_fallback:
+        source = "market_data_fallback"
+    else:
+        source = "unavailable"
     return {
-        "ok": not loaded.empty or not profile.empty,
+        "ok": source != "unavailable",
+        "source": source,
         "fundamentalsRows": int(len(loaded)),
         "profileRows": int(len(profile)),
+        "marketDataFallback": has_market_fallback,
         "fundamentalsFiles": [_relative(path) for path in FUNDAMENTAL_FILES if path.exists()],
         "profileFiles": [_relative(path) for path in PROFILE_FILES if path.exists()],
     }

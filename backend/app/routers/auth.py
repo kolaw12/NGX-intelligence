@@ -14,10 +14,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.db.database import ensure_database_tables, get_db
 from app.db.models import PortfolioPosition, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+_tables_checked = False
 
 
 class LoginRequest(BaseModel):
@@ -51,6 +52,13 @@ def _hash_password(password: str) -> str:
 def _is_development() -> bool:
     env = os.getenv("ENV", os.getenv("APP_ENV", "development")).lower()
     return env in {"development", "dev", "test", "testing", "local"}
+
+
+def _ensure_tables() -> None:
+    global _tables_checked
+    if not _tables_checked:
+        ensure_database_tables()
+        _tables_checked = True
 
 
 def _encode_token(user: User) -> str:
@@ -153,6 +161,7 @@ def get_current_user(
 ) -> User:
     """Resolve the authenticated bearer-token user for protected endpoints."""
 
+    _ensure_tables()
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
     payload = _decode_token(authorization.split(" ", 1)[1])
@@ -179,12 +188,14 @@ def get_current_user(
 
 @router.post("/login")
 def login(input: LoginRequest, db: Session = Depends(get_db)) -> dict[str, object]:
+    _ensure_tables()
     user = _verify_user(db, input.email, input.password)
     return _session_payload(user)
 
 
 @router.post("/signup")
 def signup(input: SignupRequest, db: Session = Depends(get_db)) -> dict[str, object]:
+    _ensure_tables()
     user = _create_user(db, input.email, input.password, input.name, input.organization)
     return _session_payload(user)
 

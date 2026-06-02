@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db, init_dev_database
+from app.db.database import ensure_database_tables, get_db
 from app.db.models import ApiToken, User, UserSetting
 from app.routers.auth import _user_payload, get_current_user
 
@@ -37,7 +37,7 @@ class TokenCreate(BaseModel):
 def _ensure_tables() -> None:
     global _tables_checked
     if not _tables_checked:
-        init_dev_database()
+        ensure_database_tables()
         _tables_checked = True
 
 
