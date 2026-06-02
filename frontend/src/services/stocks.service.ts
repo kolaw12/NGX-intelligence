@@ -2,8 +2,29 @@ import type { Stock, StockDetail, FundamentalsRow, PeerStock } from "@/types/sto
 import type { OHLC, Range, SeriesPoint } from "@/types/common";
 import { http } from "./http.client";
 import stockSnapshot from "@/data/stocks.snapshot.json";
+import xgboostSignalSnapshot from "@/data/xgboost-signals.snapshot.json";
 
-const fallbackStocks = stockSnapshot as Stock[];
+type XGBoostSignal = {
+  public_symbol: string;
+  outlook: Stock["aiOutlook"];
+  confidence: number;
+  risk_score: number;
+};
+
+const xgboostSignals = xgboostSignalSnapshot.signals as Record<string, XGBoostSignal>;
+
+function withXGBoostSignal(stock: Stock): Stock {
+  const signal = xgboostSignals[stock.symbol.toUpperCase()];
+  if (!signal) return stock;
+  return {
+    ...stock,
+    aiOutlook: signal.outlook,
+    confidence: Math.round(signal.confidence),
+    riskScore: signal.risk_score,
+  };
+}
+
+const fallbackStocks = (stockSnapshot as Stock[]).map(withXGBoostSignal);
 
 function bySymbol(symbol: string) {
   return fallbackStocks.find((stock) => stock.symbol.toUpperCase() === symbol.toUpperCase());
