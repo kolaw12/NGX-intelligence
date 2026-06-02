@@ -141,20 +141,24 @@ def market_overview() -> dict[str, object]:
     volume = latest["volume"].apply(_float)
     macro = _latest_macro_values()
     asi_row = macro.get("nse_asi_close")
+    asi_change_value_row = macro.get("nse_asi_change")
     asi_change_row = macro.get("nse_asi_change_pct")
     market_cap_row = macro.get("nse_asi_mkt_cap")
+    deals_row = macro.get("nse_asi_deals")
+    volume_row = macro.get("nse_asi_volume")
     asi_change_pct = float(asi_change_row["value"]) if asi_change_row else None
+    total_volume = float(volume_row["value"]) if volume_row else float(volume.sum())
     return {
         "asi": round(float(asi_row["value"]), 2) if asi_row else None,
-        "asiChange": None,
+        "asiChange": round(float(asi_change_value_row["value"]), 2) if asi_change_value_row else None,
         "asiChangePct": round(asi_change_pct, 2) if asi_change_pct is not None else None,
         "totalMarketCap": round(float(market_cap_row["value"]), 2) if market_cap_row else None,
-        "totalVolume": round(float(volume.sum())),
+        "totalVolume": round(total_volume),
         "totalValue": round(float((close * volume).sum())),
         "advancing": int((changes > 0).sum()),
         "declining": int((changes < 0).sum()),
         "unchanged": int((changes == 0).sum()),
-        "deals": None,
+        "deals": round(float(deals_row["value"])) if deals_row else None,
         "marketStatus": "closed" if date.today().weekday() >= 5 else "open",
         "lastUpdated": pd.to_datetime(latest["date"]).max().isoformat(),
     }
