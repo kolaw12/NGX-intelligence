@@ -16,6 +16,44 @@ router = APIRouter(tags=["market"])
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MACRO_DIR = PROJECT_ROOT / "data" / "output" / "processed" / "macro"
+MARKET_INDEX_FALLBACK: dict[str, dict[str, object]] = {
+    "nse_asi_change": {
+        "date": "2026-05-15",
+        "value": -1366.9,
+        "source": "broadstreet_snapshot",
+        "unit": "index_points",
+    },
+    "nse_asi_change_pct": {
+        "date": "2026-05-15",
+        "value": -0.54,
+        "source": "broadstreet_snapshot",
+        "unit": "percent",
+    },
+    "nse_asi_close": {
+        "date": "2026-05-15",
+        "value": 250881.47,
+        "source": "broadstreet_snapshot",
+        "unit": "index_points",
+    },
+    "nse_asi_deals": {
+        "date": "2026-05-15",
+        "value": 59540.0,
+        "source": "broadstreet_snapshot",
+        "unit": "deals",
+    },
+    "nse_asi_mkt_cap": {
+        "date": "2026-05-15",
+        "value": 160796516890762.0,
+        "source": "broadstreet_snapshot",
+        "unit": "NGN",
+    },
+    "nse_asi_volume": {
+        "date": "2026-05-15",
+        "value": 678182684.0,
+        "source": "broadstreet_snapshot",
+        "unit": "shares",
+    },
+}
 
 @router.get("/sectors")
 @ttl_cache(ttl_seconds=600, name="sectors")
@@ -222,12 +260,12 @@ def _latest_macro_values() -> dict[str, dict[str, object]]:
         except Exception:
             continue
     if not frames:
-        return {}
+        return dict(MARKET_INDEX_FALLBACK)
     macro = pd.concat(frames, ignore_index=True)
     macro["date"] = pd.to_datetime(macro["date"], errors="coerce")
     macro = macro.dropna(subset=["date", "indicator", "value"]).sort_values(["indicator", "date"])
     latest = macro.groupby("indicator", as_index=False).tail(1)
-    return {
+    values = {
         str(row["indicator"]): {
             "date": row["date"].date().isoformat(),
             "value": float(row["value"]),
@@ -236,6 +274,9 @@ def _latest_macro_values() -> dict[str, dict[str, object]]:
         }
         for _, row in latest.iterrows()
     }
+    for indicator, fallback in MARKET_INDEX_FALLBACK.items():
+        values.setdefault(indicator, fallback)
+    return values
 
 
 def _macro_change_pct(indicator: str) -> float:
