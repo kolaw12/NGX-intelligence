@@ -40,7 +40,11 @@ def get_backend_model_config() -> dict[str, Any]:
             raise TypeError("backend_model_config.json must contain an object")
         config = {**DEFAULT_CONFIG, **loaded}
         config["use_lstm"] = bool(config.get("use_lstm", False))
-        config["xgb_weight"] = _safe_weight(config.get("xgb_weight"), DEFAULT_CONFIG["xgb_weight"])
+        # Support legacy key name "xgboost_weight" alongside canonical "xgb_weight"
+        config["xgb_weight"] = _safe_weight(
+            config.get("xgb_weight") or config.get("xgboost_weight"),
+            DEFAULT_CONFIG["xgb_weight"],
+        )
         config["lstm_weight"] = _safe_weight(config.get("lstm_weight"), DEFAULT_CONFIG["lstm_weight"])
         if not isinstance(config.get("xgb_required_features"), list):
             config["xgb_required_features"] = []

@@ -138,13 +138,30 @@ export default function Settings() {
           </div>
           <div className="rounded-lg border border-border bg-surface-elevated/40 p-4">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-semibold text-foreground">Engine health</p>
-              <Badge variant={engineHealth.data?.status === "ok" ? "success" : "warning"}>
-                {engineHealth.isLoading ? "Checking" : engineHealth.data?.status ?? "Unavailable"}
+              <p className="text-sm font-semibold text-foreground">LSTM time-series</p>
+              <Badge variant={modelStatus.data?.lstm_quality_passed ? "success" : "warning"}>
+                {modelStatus.isLoading ? "Checking" : modelStatus.data?.lstm_quality_passed ? "Quality gate passed" : "Quality gate failed"}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              LSTM: {modelStatus.data?.use_lstm ? (modelStatus.data.lstm_loaded ? "enabled and loaded" : "enabled but unavailable") : "disabled"}
+              {modelStatus.data
+                ? modelStatus.data.lstm_quality_reason ?? "No metrics"
+                : "Loading..."}
+            </p>
+            {modelStatus.data?.lstm_metrics && Object.keys(modelStatus.data.lstm_metrics).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {["roc_auc", "mcc", "balanced_accuracy"].map((k) => {
+                  const val = (modelStatus.data!.lstm_metrics as Record<string, number>)[k];
+                  return val !== undefined ? (
+                    <span key={k} className="text-[10px] text-muted-foreground">
+                      {k.replace(/_/g, " ")}: <span className="font-semibold text-foreground">{Number(val).toFixed(3)}</span>
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              Strategy: <span className="font-medium text-foreground">{modelStatus.data?.prediction_strategy ?? "—"}</span>
             </p>
           </div>
           <div className="rounded-lg border border-border bg-surface-elevated/40 p-4">

@@ -977,7 +977,6 @@ MACRO_FETCHERS = [
 
 
 # ===================== Stage 6 — news =====================
-
 def news():
     """
     Stage 6: news data fetchers.
@@ -1005,22 +1004,37 @@ def news():
             logger.error(f"{label}: failed — {e}")
             failures.append(label)
 
-    elapsed = time.time() - started
+    # --- FIX: Calculate elapsed time right here ---
+    elapsed = time.time() - started 
+
     if failures:
-        logger.error(
-            f"News stage finished with {len(failures)} failure(s) in "
-            f"{elapsed:.1f}s: {failures}"
+        logger.warning(
+            f"News stage finished with {len(failures)} non-fatal failure(s) in "
+            f"{elapsed:.1f}s: {failures}. Continuing with available data."
         )
-        sys.exit(1)
+    else:
+        logger.success(
+            f"News stage complete: {len(NEWS_FETCHERS)} fetcher(s) in {elapsed:.1f}s"
+        )
 
     # Build and persist a news sentiment summary after news ingestion.
     summary_df = _build_daily_sentiment_summary()
     _save_daily_sentiment_summary_to_disk(summary_df)
     _write_daily_sentiment_summary_to_warehouse(summary_df)
 
-    logger.success(
-        f"News stage complete: {len(NEWS_FETCHERS)} fetcher(s) in {elapsed:.1f}s"
-    )
+    if not failures:
+        logger.success(
+            f"News stage complete: {len(NEWS_FETCHERS)} fetcher(s) in {elapsed:.1f}s"
+        )
+
+    # NEW: Also run full FinBERT pipeline if not disabled
+    if os.getenv("NUPAT_DISABLE_FINBERT") != "1":
+        try:
+            from backend.app.nlp.sentiment_pipeline import run_pipeline
+            run_pipeline(since_days_ago=1)
+            logger.success("FinBERT sentiment pipeline complete")
+        except Exception as e:
+            logger.warning(f"FinBERT pipeline failed (non-fatal): {e}")
 
 
 def sentiment_summary():
@@ -1052,10 +1066,17 @@ def _run_businessday():
     fetcher.run(max_articles=_news_max_articles())
 
 
-# Register news fetchers here. New ones (Nairametrics, Proshare) go here.
+def _run_nairametrics():
+    from data.fetchers.news.nairametrics import NairametricsFetcher
+    # RSS-based — no request cap needed (only 4 feed URLs fetched per run)
+    fetcher = NairametricsFetcher()
+    fetcher.run(max_articles=_news_max_articles())
+
+
 NEWS_FETCHERS = [
-    ("NGX Announcements", _run_ngx_announcements),
-    ("BusinessDay Nigeria", _run_businessday),
+    ("Nairametrics (RSS)", _run_nairametrics),       # highest-value NGX source
+    ("NGX Announcements", _run_ngx_announcements),   # official exchange notices
+    ("BusinessDay Nigeria", _run_businessday),        # business daily
 ]
 
 

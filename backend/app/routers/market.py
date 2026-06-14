@@ -125,14 +125,15 @@ def macro_indicators() -> list[dict[str, object]]:
         return []
 
     indicators = []
+    # canonical_unit overrides whatever raw string the parquet stores
     mapping = {
-        "nse_asi_close": ("asi", "NGX All-Share Index", "index_points"),
-        "nse_asi_change_pct": ("asi-change", "NGX ASI Daily Change", "%"),
-        "nse_asi_mkt_cap": ("market-cap", "NGX Market Capitalization", "NGN"),
-        "usd_ngn_rate": ("fx-official", "NGN / USD", "NGN"),
-        "brent_oil_usd": ("brent", "Brent Crude", "$"),
+        "nse_asi_close":     ("asi",        "NGX All-Share Index",       "pts"),
+        "nse_asi_change_pct":("asi-change", "NGX ASI Daily Change",      "%"),
+        "nse_asi_mkt_cap":   ("market-cap", "NGX Market Capitalization", "NGN"),
+        "usd_ngn_rate":      ("fx-official","NGN / USD",                 "NGN"),
+        "brent_oil_usd":     ("brent",      "Brent Crude",               "USD/bbl"),
     }
-    for indicator, (key, label, default_unit) in mapping.items():
+    for indicator, (key, label, canonical_unit) in mapping.items():
         row = latest.get(indicator)
         if not row:
             continue
@@ -141,8 +142,8 @@ def macro_indicators() -> list[dict[str, object]]:
                 "key": key,
                 "label": label,
                 "value": round(float(row["value"]), 2),
-                "unit": str(row.get("unit") or default_unit),
-                "changePct": round(_macro_change_pct(indicator), 2),
+                "unit": canonical_unit,
+                "changePct": round(_macro_change_pct(indicator), 2) if key != "asi-change" else 0.0,
                 "asOf": row["date"],
                 "source": str(row.get("source", "local")),
             }

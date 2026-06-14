@@ -8,6 +8,7 @@ are returned as unavailable rather than fabricated.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
@@ -56,7 +57,9 @@ ALIASES = {
     "website": ("website", "url", "web"),
     "ceo": ("ceo", "chief_executive", "managing_director", "md_ceo"),
     "description": ("description", "profile", "business_description", "company_description"),
+    "business_model": ("business_model", "business_description_short"),
     "industry": ("industry", "subsector", "sub_sector"),
+    "key_risks": ("key_risks", "risks", "risk_factors"),
     "fiscal_year": ("fiscal_year", "year", "fy"),
     "period": ("period", "reporting_period"),
     "revenue": ("revenue", "turnover", "gross_earnings"),
@@ -107,9 +110,33 @@ def load_fundamentals() -> pd.DataFrame:
 
 @lru_cache(maxsize=1)
 def load_company_profiles() -> pd.DataFrame:
-    """Load normalized company profile rows from the first available real export."""
+    """Load normalized company profile rows from the first available real export, then JSON fallback."""
 
-    return _load_first_existing(PROFILE_FILES)
+    frame = _load_first_existing(PROFILE_FILES)
+    if not frame.empty:
+        return frame
+    return _load_json_profiles()
+
+
+def _load_json_profiles() -> pd.DataFrame:
+    """Load company profiles from data/master/company_profiles.json (ticker-keyed dict)."""
+    json_path = MASTER_DIR / "company_profiles.json"
+    if not json_path.exists():
+        return pd.DataFrame()
+    try:
+        data = json.loads(json_path.read_text())
+        rows = []
+        for ticker, profile in data.items():
+            row = {"ticker": ticker}
+            row.update(profile)
+            rows.append(row)
+        frame = pd.DataFrame(rows)
+        frame = _normalize_columns(frame)
+        logger.info("Loaded %d company profiles from %s", len(frame), json_path)
+        return frame
+    except Exception as exc:
+        logger.warning("Failed to load company profiles JSON: %s", exc)
+        return pd.DataFrame()
 
 
 def latest_company_record(ticker: str) -> FundamentalsRecord:
@@ -204,9 +231,13 @@ def _normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
     normalized = normalized.rename(columns=rename)
     if "ticker" in normalized.columns:
         normalized["ticker"] = normalized["ticker"].astype(str).str.upper().str.strip().apply(canonical_ticker)
+    _STRING_COLUMNS = {"ticker", "headquarters", "website", "ceo", "description", "business_model", "industry", "key_risks", "company_name", "sector", "period"}
     for column in normalized.columns:
-        if column not in {"ticker", "headquarters", "website", "ceo", "description", "industry", "period"}:
-            normalized[column] = pd.to_numeric(normalized[column], errors="ignore")
+        if column not in _STRING_COLUMNS:
+            try:
+                normalized[column] = pd.to_numeric(normalized[column])
+            except (TypeError, ValueError):
+                pass
     return normalized
 
 
@@ -219,9 +250,9 @@ def _latest_row(rows: pd.DataFrame) -> pd.Series:
 
 def _year_value(series: pd.Series, years: list[int], offset: int) -> Any:
     if len(years) < offset:
-        return "Unavailable"
+        return "—"
     value = series.get(float(years[-offset]), series.get(years[-offset], np.nan))
-    return _json_value(value) if not pd.isna(value) else "Unavailable"
+    return _json_value(value) if not pd.isna(value) else "—"
 
 
 def _json_value(value: Any) -> Any:

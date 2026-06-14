@@ -120,6 +120,27 @@ NEGATIONS = {
     "neither",
     "nor",
 }
+
+# Words that indicate catastrophic or criminal events — model confidence must be reduced
+CRITICAL_SEVERITY_WORDS: frozenset[str] = frozenset({
+    "fraud", "fraudulent", "arrested", "arraigned", "convicted", "criminal",
+    "efcc", "icpc", "laundering", "embezzlement", "bribery", "corrupt", "forgery",
+    "delisted", "delisting", "suspended",
+    "winding", "liquidation", "bankrupt", "insolvency", "insolvent", "receivership",
+    "revoked", "revocation", "seized",
+    "falsified", "restatement", "manipulation",
+})
+
+# Words indicating high-impact but non-catastrophic events
+HIGH_SEVERITY_WORDS: frozenset[str] = frozenset({
+    "sanction", "sanctioned", "penalized", "penalty", "fined", "investigated",
+    "investigation", "probe", "injunction", "lawsuit", "litigation",
+    "default", "defaulted", "covenant", "negative_equity", "going_concern",
+    "material_weakness", "impairment",
+    "resigned", "sacked", "dismissed", "terminated", "ousted",
+    "fire", "explosion", "cyberattack", "shutdown",
+    "omitted", "cancelled", "withheld",
+})
 EVENT_KEYWORDS = {
     "earnings": {"earnings", "profit", "profits", "profitability", "revenue", "results", "quarter", "audited"},
     "dividend": {"dividend", "bonus", "payout", "distribution"},
@@ -520,3 +541,141 @@ def _valid_tickers() -> set[str]:
     except Exception as exc:
         logger.warning("Could not load ticker master for news NLP validation: %s", exc)
         return set()
+
+
+def latest_package_breakdown_for_ticker(ticker: str) -> list[dict] | None:
+    """Return per-headline sentiment breakdown from the newest sentiment_pipeline.py JSON export."""
+
+    package = load_latest_sentiment_package()
+    if not package:
+        return None
+    canonical = canonical_ticker(ticker)
+    for row in package.get("stock_sentiments", []) or []:
+        row_ticker = canonical_ticker(str(row.get("ticker", "")))
+        if row_ticker != canonical:
+            continue
+        return [
+            {
+                "headline"     : item.get("headline", ""),
+                "originalHeadline": item.get("original_headline", ""),
+                "sentiment"    : item.get("sentiment", "neutral"),
+                "confidence"   : float(item.get("confidence", 0.0) or 0.0),
+                "score"        : float(item.get("score", 0.0) or 0.0),
+                "source"       : item.get("source", ""),
+                "url"          : item.get("url", ""),
+            }
+            for item in row.get("breakdown", [])
+        ]
+    return None
+
+
+def latest_package_momentum_for_ticker(ticker: str) -> dict | None:
+    """Return momentum / rolling-average context for one ticker from the newest package."""
+
+    package = load_latest_sentiment_package()
+    if not package:
+        return None
+    canonical = canonical_ticker(ticker)
+    for row in package.get("stock_sentiments", []) or []:
+        row_ticker = canonical_ticker(str(row.get("ticker", "")))
+        if row_ticker != canonical:
+            continue
+        return {
+            "ticker"          : canonical,
+            "momentum"        : float(row.get("momentum", 0.0) or 0.0),
+            "momentum_signal" : str(row.get("momentum_signal", "NEUTRAL") or "NEUTRAL"),
+            "rolling_avg_7d"  : _safe_optional_float(row.get("rolling_avg_7d")),
+            "rolling_avg_30d" : _safe_optional_float(row.get("rolling_avg_30d")),
+            "trend_direction" : str(row.get("trend_direction", "flat") or "flat"),
+            "as_of_date"      : str(package.get("date")) if package.get("date") else None,
+            "sentiment_score" : float(row.get("sentiment_score", 0.0) or 0.0),
+            "signal"          : str(row.get("signal", "NEUTRAL") or "NEUTRAL"),
+            "article_count"   : int(row.get("article_count", 0) or 0),
+        }
+    return None
+
+
+def load_sentiment_history_for_ticker(ticker: str, category: str = "stock", days: int = 30) -> pd.DataFrame:
+    """Return recent historical sentiment rows for one ticker."""
+
+    from pathlib import Path
+    history_path = (
+        Path(__file__).resolve().parents[2]
+        / "backend" / "app" / "nlp"
+        / "historical_sentiment.parquet"
+    )
+    if not history_path.exists():
+        return pd.DataFrame(columns=["date", "ticker", "sentiment_score", "signal", "article_count", "category"])
+    try:
+        df = pd.read_parquet(history_path)
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.dropna(subset=["date"])
+        df = df[df["category"] == category]
+        df = df[df["ticker"].str.upper() == canonical_ticker(ticker)]
+        cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
+        df = df[df["date"] >= cutoff]
+        return df.sort_values("date").reset_index(drop=True)
+    except Exception as exc:
+        logger.warning("Failed to load sentiment history for %s: %s", ticker, exc)
+        return pd.DataFrame(columns=["date", "ticker", "sentiment_score", "signal", "article_count", "category"])
+
+
+def detect_high_severity_events_for_ticker(ticker: str) -> tuple[str, list[str]]:
+    """Scan the latest news package for catastrophic or high-impact event signals.
+
+    Returns:
+        (severity_level, list_of_triggered_descriptions)
+
+        severity_level is one of:
+          "CRITICAL" — criminal, delisting, insolvency, fraud (override BUY/SELL → HOLD)
+          "HIGH"     — regulatory action, default, executive shock (suppress BUY)
+          "NORMAL"   — no high-impact events detected
+    """
+    package = load_latest_sentiment_package()
+    if not package:
+        return "NORMAL", []
+
+    canonical = canonical_ticker(ticker)
+    headlines: list[str] = []
+    for row in package.get("stock_sentiments", []) or []:
+        if canonical_ticker(str(row.get("ticker", ""))) != canonical:
+            continue
+        for item in row.get("breakdown", []) or []:
+            h = str(item.get("headline", "") or "").strip()
+            if h:
+                headlines.append(h)
+        break
+
+    if not headlines:
+        return "NORMAL", []
+
+    triggered_critical: list[str] = []
+    triggered_high: list[str] = []
+
+    for headline in headlines:
+        tokens = set(re.findall(r"\w+", headline.lower()))
+        crit_hits = tokens & CRITICAL_SEVERITY_WORDS
+        high_hits = tokens & HIGH_SEVERITY_WORDS
+        short = headline[:100]
+        if crit_hits:
+            triggered_critical.append(f"{short!r} — keywords: {', '.join(sorted(crit_hits))}")
+        elif high_hits:
+            triggered_high.append(f"{short!r} — keywords: {', '.join(sorted(high_hits))}")
+
+    if triggered_critical:
+        return "CRITICAL", triggered_critical
+    if triggered_high:
+        return "HIGH", triggered_high
+    return "NORMAL", []
+
+
+def _safe_optional_float(value: object) -> float | None:
+    """Return a float if the value is parseable, otherwise None."""
+
+    try:
+        parsed = float(value)
+        if not pd.isna(parsed) and pd.isfinite(parsed):
+            return float(parsed)
+    except (TypeError, ValueError):
+        pass
+    return None

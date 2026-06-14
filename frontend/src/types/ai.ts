@@ -22,6 +22,10 @@ export interface AIInsight {
   generatedAt: string;
   horizonDays: number;
   modelVersion: string;
+  regimeAlert?: boolean;
+  regimeReason?: string | null;
+  eventSeverity?: "CRITICAL" | "HIGH" | "NORMAL";
+  eventAlerts?: string[];
 }
 
 export interface MarketSentiment {

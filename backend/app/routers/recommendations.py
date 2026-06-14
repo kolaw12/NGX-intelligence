@@ -18,8 +18,11 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from app.db.crud import get_latest_by_ticker, get_ticker_prices, load_macro_asi, public_ticker, save_recommendation_signal
 from app.db.database import SessionLocal
+from app.explain.nlg_generator import NLGGenerator
 from app.explain.shap_explainer import ShapExplainer
 from app.services.cache import ttl_cache
+from app.services.rule_engine import SignalOutput
+from app.utils.enums import RecommendationAction, SignalStrength
 from app.services.backend_model_config import get_backend_model_config
 from app.services.feature_engineer import FeatureEngineer
 from app.services.lstm_predictor import DEFAULT_MODEL_PATH as LSTM_MODEL_PATH
@@ -27,9 +30,13 @@ from app.services.lstm_predictor import DEFAULT_SCALER_PATH as LSTM_SCALER_PATH
 from app.services.lstm_predictor import LSTMPredictor
 from app.services.news_sentiment import (
     SENTIMENT_SUMMARY_PATH,
+    detect_high_severity_events_for_ticker,
     latest_market_package_sentiment,
+    latest_package_breakdown_for_ticker,
+    latest_package_momentum_for_ticker,
     latest_sentiment_for_ticker,
     load_daily_sentiment_summary,
+    load_sentiment_history_for_ticker,
 )
 from app.services.risk_analyzer import RiskAnalyzer
 from app.services.xgboost_predictor import (
@@ -38,7 +45,6 @@ from app.services.xgboost_predictor import (
     action_from_probability,
     confidence_from_probability,
     predict_with_xgboost,
-    reason_for_prediction,
 )
 
 logger = logging.getLogger(__name__)
@@ -359,6 +365,29 @@ def _sentiment_gauge_label(score: int) -> str:
     return "extreme-greed"
 
 
+def _lstm_passes_quality_gate(config: dict) -> tuple[bool, str]:
+    """Return (passed, reason) based on lstm_quality_requirements vs lstm_metrics in config."""
+    requirements = config.get("lstm_quality_requirements", {})
+    metrics = config.get("lstm_metrics", {})
+    roc_auc = float(metrics.get("roc_auc", 0.0))
+    mcc = float(metrics.get("mcc", -1.0))
+    bal_acc = float(metrics.get("balanced_accuracy", 0.0))
+    predicted_up_pct = float(metrics.get("predicted_up_pct", 50.0))
+    up_range = requirements.get("predicted_up_pct_range", [20, 80])
+    min_roc = float(requirements.get("min_roc_auc", 0.55))
+    min_mcc = float(requirements.get("min_mcc", 0.05))
+    min_bal = float(requirements.get("min_balanced_accuracy", 0.55))
+    if roc_auc < min_roc:
+        return False, f"ROC-AUC {roc_auc:.3f} < threshold {min_roc:.2f}"
+    if mcc < min_mcc:
+        return False, f"MCC {mcc:.4f} < threshold {min_mcc:.4f}"
+    if bal_acc < min_bal:
+        return False, f"Balanced accuracy {bal_acc:.3f} < threshold {min_bal:.2f}"
+    if not (up_range[0] <= predicted_up_pct <= up_range[1]):
+        return False, f"Predicted UP% {predicted_up_pct:.1f}% outside range {up_range}"
+    return True, "LSTM passed all quality thresholds"
+
+
 def _build_recommendation(ticker: str) -> tuple[dict[str, object], dict[str, object]]:
     """Run the XGBoost-first public recommendation pipeline for one ticker."""
 
@@ -368,8 +397,14 @@ def _build_recommendation(ticker: str) -> tuple[dict[str, object], dict[str, obj
     latest_model_features = feature_result.model_features.tail(1)
     latest = latest_features.iloc[-1]
 
-    risk = RiskAnalyzer().analyze(feature_result.features, str(latest["ticker"]), macro_df=load_macro_asi())
     sentiment = latest_sentiment_for_ticker(str(latest["ticker"]))
+    event_severity, event_alerts = detect_high_severity_events_for_ticker(str(latest["ticker"]))
+    risk = RiskAnalyzer().analyze(
+        feature_result.features,
+        str(latest["ticker"]),
+        macro_df=load_macro_asi(),
+        sentiment_score=sentiment.score,
+    )
     shap_explainer = _get_shap_explainer()
     try:
         xgb_prediction = predict_with_xgboost(latest_model_features)
@@ -381,6 +416,10 @@ def _build_recommendation(ticker: str) -> tuple[dict[str, object], dict[str, obj
     model_source = "xgboost_only"
     lstm_probability = None
     lstm_model_version = "disabled"
+    lstm_available = False
+    lstm_quality_passed = False
+    lstm_used_in_final_decision = False
+    lstm_reason = "LSTM model files not found — XGBoost-led mode active."
     config = get_backend_model_config()
     if config.get("use_lstm", False):
         try:
@@ -389,12 +428,22 @@ def _build_recommendation(ticker: str) -> tuple[dict[str, object], dict[str, obj
             logger.warning("Optional LSTM prediction failed for %s: %s", ticker, exc)
             lstm_probability, lstm_model_version = None, "lstm-error"
         if lstm_probability is not None:
-            xgb_weight = float(config.get("xgb_weight", 0.80))
-            lstm_weight = float(config.get("lstm_weight", 0.20))
-            total_weight = xgb_weight + lstm_weight
-            if total_weight > 0:
-                final_probability = ((xgb_probability * xgb_weight) + (lstm_probability * lstm_weight)) / total_weight
-                model_source = "xgboost_lstm_weighted"
+            lstm_available = True
+            lstm_quality_passed, lstm_quality_reason = _lstm_passes_quality_gate(config)
+            if lstm_quality_passed:
+                xgb_weight = float(config.get("xgb_weight", 0.80))
+                lstm_weight = float(config.get("lstm_weight", 0.20))
+                total_weight = xgb_weight + lstm_weight
+                if total_weight > 0:
+                    final_probability = ((xgb_probability * xgb_weight) + (lstm_probability * lstm_weight)) / total_weight
+                lstm_used_in_final_decision = True
+                model_source = "xgboost_lstm_blend"
+                lstm_reason = f"LSTM blended at {float(config.get('lstm_weight', 0.20)):.0%} weight. {lstm_quality_reason}"
+            else:
+                model_source = "xgboost_led_with_lstm_diagnostic"
+                lstm_reason = f"LSTM loaded but did not pass quality gate: {lstm_quality_reason}. XGBoost-led mode active."
+        else:
+            lstm_reason = f"LSTM unavailable: {lstm_model_version}. XGBoost-led mode active."
 
     base_action = action_from_probability(final_probability)
     action = base_action
@@ -410,8 +459,73 @@ def _build_recommendation(ticker: str) -> tuple[dict[str, object], dict[str, obj
     if action in {"BUY", "SELL"} and confidence < 0.16:
         action = "HOLD"
         filter_reasons.append("Directional confidence is too low for an active BUY or SELL signal.")
+
+    # Event severity overrides — news-driven events the model has not seen
+    if event_severity == "CRITICAL":
+        action = "HOLD"
+        confidence = min(confidence, 0.10)
+        filter_reasons.append(
+            "CRITICAL market event detected in news — model output overridden. "
+            "Do not act on any directional signal until this resolves."
+        )
+    elif event_severity == "HIGH" and action == "BUY":
+        action = "HOLD"
+        filter_reasons.append("BUY downgraded to HOLD: high-severity news event detected.")
+
+    # Volatility regime override — statistical distribution has shifted
+    if risk.regime_alert:
+        if action == "BUY":
+            action = "HOLD"
+            filter_reasons.append(f"BUY downgraded to HOLD: abnormal volatility regime. {risk.regime_reason}")
+        else:
+            filter_reasons.append(f"Model confidence reduced: abnormal volatility regime. {risk.regime_reason}")
+
+    shap_explainer = _get_shap_explainer()
     shap_explanation = shap_explainer.explain_single(latest_model_features)
-    explanation = _xgb_explanation(action, final_probability, shap_explanation.drivers, risk.risk_score, sentiment.score, filter_reasons)
+    try:
+        _nlg_signal = SignalOutput(
+            ticker=str(latest["ticker"]),
+            date=risk.date,
+            recommendation=RecommendationAction(action),
+            confidence=confidence * 100,
+            risk_score=risk.risk_score,
+            signal_strength=SignalStrength(_signal_strength(confidence)),
+            ensemble_prob=final_probability,
+            reasons=filter_reasons,
+        )
+        explanation = NLGGenerator().generate(
+            signal=_nlg_signal,
+            shap_values=shap_explanation.drivers,
+            sentiment_label=sentiment.label,
+            risk_profile=risk,
+        )
+        explanation["risk_notes"] = filter_reasons
+        explanation["model_notes"] = [
+            "XGBoost is the primary model. LSTM is quality-gated and blended when it passes."
+        ]
+    except Exception as _nlg_exc:
+        logger.warning("NLG generation failed for %s, using fallback: %s", ticker, _nlg_exc)
+        explanation = _xgb_explanation(
+            action, final_probability, shap_explanation.drivers,
+            risk.risk_score, sentiment.score, filter_reasons,
+        )
+
+    momentum = latest_package_momentum_for_ticker(str(latest["ticker"]))
+    article_breakdown = latest_package_breakdown_for_ticker(str(latest["ticker"])) or []
+    sentiment_history = load_sentiment_history_for_ticker(str(latest["ticker"]), days=30)
+
+    history_payload = []
+    if not sentiment_history.empty:
+        for _, row in sentiment_history.iterrows():
+            history_payload.append(
+                {
+                    "date"           : row["date"].date().isoformat() if hasattr(row["date"], "date") else str(row["date"]),
+                    "sentiment_score": float(row["sentiment_score"] or 0.0),
+                    "signal"         : str(row.get("signal", "NEUTRAL") or "NEUTRAL"),
+                    "article_count"  : int(row.get("article_count", 0) or 0),
+                }
+            )
+
     recommendation = {
         "ticker": public_ticker(str(latest["ticker"])),
         "date": risk.date.isoformat(),
@@ -427,12 +541,27 @@ def _build_recommendation(ticker: str) -> tuple[dict[str, object], dict[str, obj
         "main_model": "xgboost",
         "model_source": model_source,
         "reason": _recommendation_reason(action, base_action, final_probability, risk.risk_score, sentiment.score, filter_reasons),
+        "xgboost_probability": round(xgb_probability, 3),
         "xgb_probability": round(xgb_probability, 3),
+        "final_probability": round(final_probability, 4),
         "lstm_probability": round(lstm_probability, 3) if lstm_probability is not None else None,
+        "lstm_available": lstm_available,
+        "lstm_quality_passed": lstm_quality_passed,
+        "lstm_used_in_final_decision": lstm_used_in_final_decision,
+        "lstm_reason": lstm_reason,
         "sentiment_score": round(sentiment.score, 3),
         "sentiment_label": sentiment.label,
         "sector_adjustment": None,
         "explanation": explanation,
+        "regime_alert": risk.regime_alert,
+        "regime_reason": risk.regime_reason if risk.regime_alert else None,
+        "event_severity": event_severity,
+        "event_alerts": event_alerts,
+        "news": {
+            "momentum"      : momentum,
+            "articles"      : article_breakdown,
+            "history"       : history_payload,
+        },
     }
     debug_payload = {
         "feature_snapshot": latest_model_features.tail(1).to_dict(orient="records")[0],
@@ -552,4 +681,16 @@ def _recommendation_to_ai_insight(recommendation: dict[str, object]) -> dict[str
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "horizonDays": 90,
         "modelVersion": "ngx-advisor-v0.1",
+        "xgboostProbability": recommendation.get("xgboost_probability"),
+        "lstmProbability": recommendation.get("lstm_probability"),
+        "lstmAvailable": recommendation.get("lstm_available", False),
+        "lstmQualityPassed": recommendation.get("lstm_quality_passed", False),
+        "lstmUsedInFinalDecision": recommendation.get("lstm_used_in_final_decision", False),
+        "lstmReason": recommendation.get("lstm_reason"),
+        "modelSource": recommendation.get("model_source", "xgboost_only"),
+        "finalProbability": recommendation.get("final_probability"),
+        "regimeAlert": bool(recommendation.get("regime_alert", False)),
+        "regimeReason": recommendation.get("regime_reason"),
+        "eventSeverity": recommendation.get("event_severity", "NORMAL"),
+        "eventAlerts": recommendation.get("event_alerts", []),
     }

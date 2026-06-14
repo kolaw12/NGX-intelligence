@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Query
 
 from app.db.crud import MACRO_ASI_PATH, PRICE_DATA_PATH, TICKERS_PATH, load_prices, load_tickers
+from app.db.database import SessionLocal
 from app.services.backend_model_config import get_backend_model_config
 from app.services.fundamentals_service import fundamentals_status
 from app.services.news_sentiment import load_daily_sentiment_summary
@@ -51,6 +53,7 @@ def model_status() -> dict[str, Any]:
     lstm_scaler_path = _first_existing(PROJECT_ROOT / "scalers" / "lstm_scaler.pkl", MODELS_DIR / "lstm_scaler.pkl")
     use_lstm = bool(config.get("use_lstm", False))
     lstm_loaded = bool(use_lstm and lstm_model_path and lstm_scaler_path)
+    lstm_quality_passed, lstm_quality_reason = _eval_lstm_quality_gate(config)
 
     return {
         "xgboost_loaded": xgb_loaded,
@@ -62,11 +65,14 @@ def model_status() -> dict[str, Any]:
         "lstm_model_path": _relative(lstm_model_path) if lstm_model_path else None,
         "lstm_scaler_path": _relative(lstm_scaler_path) if lstm_scaler_path else None,
         "use_lstm": use_lstm,
+        "lstm_quality_passed": lstm_quality_passed,
+        "lstm_quality_reason": lstm_quality_reason,
+        "lstm_quality_requirements": config.get("lstm_quality_requirements", {}),
+        "lstm_metrics": config.get("lstm_metrics", {}),
         "main_model": "xgboost",
         "backend_config_loaded": config_loaded,
         "backend_config_path": _relative(_config_path()) if config_loaded else None,
         "xgb_metrics": _load_json(REPORTS_DIR / "xgb_metrics.json", MODELS_DIR / "xgb_metrics.json"),
-        "lstm_metrics": _load_json(REPORTS_DIR / "lstm_metrics.json", MODELS_DIR / "lstm_metrics.json"),
     }
 
 
@@ -112,7 +118,9 @@ def engine_health(deep: bool = Query(default=False)) -> dict[str, Any]:
         "ok": True,
         "enabled": bool(status["use_lstm"]),
         "loaded": bool(status["lstm_loaded"]),
-        "note": "LSTM is optional and not required for production XGBoost inference.",
+        "quality_passed": bool(status["lstm_quality_passed"]),
+        "quality_reason": status["lstm_quality_reason"],
+        "note": "LSTM is optional. Quality gate controls whether it blends into the final recommendation.",
     }
 
     try:
@@ -128,6 +136,74 @@ def engine_health(deep: bool = Query(default=False)) -> dict[str, Any]:
 
     overall = "ok" if all(check.get("ok") for key, check in checks.items() if key != "lstm_optional") else "degraded"
     return {"status": overall, "main_model": "xgboost", "checks": checks}
+
+
+@router.get("/model/performance")
+def model_performance() -> dict[str, Any]:
+    """Return historical recommendation accuracy from persisted signals."""
+    from app.db.models import RecommendationSignal
+    from sqlalchemy import func
+
+    db = SessionLocal()
+    try:
+        total = db.query(func.count(RecommendationSignal.id)).scalar() or 0
+        if total == 0:
+            return {
+                "available": False,
+                "message": "Not enough recommendation history yet.",
+                "signals_count": 0,
+            }
+        recent = (
+            db.query(RecommendationSignal)
+            .order_by(RecommendationSignal.signal_date.desc())
+            .limit(500)
+            .all()
+        )
+        by_action: dict[str, int] = {}
+        lstm_used_count = 0
+        for sig in recent:
+            action = sig.recommendation.value if hasattr(sig.recommendation, "value") else str(sig.recommendation)
+            by_action[action] = by_action.get(action, 0) + 1
+            mv = sig.model_versions or {}
+            if str(mv.get("lstm", "disabled")).startswith("lstm-") and mv.get("lstm") not in {"disabled", "lstm-error", "missing-lstm-model"}:
+                lstm_used_count += 1
+        latest_date = recent[0].signal_date.isoformat() if recent else None
+        return {
+            "available": True,
+            "signals_count": total,
+            "recent_count": len(recent),
+            "latest_signal_date": latest_date,
+            "signals_by_action": by_action,
+            "lstm_blended_count": lstm_used_count,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    finally:
+        db.close()
+
+
+def _eval_lstm_quality_gate(config: dict[str, Any]) -> tuple[bool, str]:
+    """Return (passed, reason) for LSTM quality gate based on config metrics vs thresholds."""
+    requirements = config.get("lstm_quality_requirements", {})
+    metrics = config.get("lstm_metrics", {})
+    roc_auc = float(metrics.get("roc_auc", 0.0))
+    mcc = float(metrics.get("mcc", -1.0))
+    bal_acc = float(metrics.get("balanced_accuracy", 0.0))
+    predicted_up_pct = float(metrics.get("predicted_up_pct", 50.0))
+    up_range = requirements.get("predicted_up_pct_range", [20, 80])
+    min_roc = float(requirements.get("min_roc_auc", 0.55))
+    min_mcc = float(requirements.get("min_mcc", 0.05))
+    min_bal = float(requirements.get("min_balanced_accuracy", 0.55))
+    if not metrics:
+        return False, "No LSTM metrics available in config"
+    if roc_auc < min_roc:
+        return False, f"ROC-AUC {roc_auc:.3f} < threshold {min_roc:.2f}"
+    if mcc < min_mcc:
+        return False, f"MCC {mcc:.4f} < threshold {min_mcc:.4f}"
+    if bal_acc < min_bal:
+        return False, f"Balanced accuracy {bal_acc:.3f} < threshold {min_bal:.2f}"
+    if not (up_range[0] <= predicted_up_pct <= up_range[1]):
+        return False, f"Predicted UP% {predicted_up_pct:.1f}% outside range {up_range}"
+    return True, "LSTM passed all quality thresholds"
 
 
 def _config_path() -> Path:

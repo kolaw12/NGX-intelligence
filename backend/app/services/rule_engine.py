@@ -1,9 +1,11 @@
 """Intelligence layer rule engine for NGX AI Advisor recommendations.
 
-This module converts model probabilities, sentiment, risk, and sector context
-into a final investment action. It connects upstream ML/NLP/risk services to
-downstream explanation generation, persistence, and FastAPI recommendation
-responses.
+NOTE: This module is NOT used in the live recommendation API path.
+The canonical recommendation pipeline lives in app/routers/recommendations.py,
+which runs XGBoost → quality-gate LSTM blend → risk/sentiment filters directly.
+rule_engine.py exists for potential A/B testing or alternate signal-combination
+strategies. Its 60/40 XGB/LSTM weighting differs from the API's 80/20 blend.
+SignalOutput is imported by app/explain/nlg_generator.py for the output dataclass.
 """
 
 from __future__ import annotations

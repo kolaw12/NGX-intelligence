@@ -22,6 +22,7 @@ export interface Stock {
   low52w: number;
   beta: number | null;
   sparkline: number[];
+  dataAsOf: string | null;
 }
 
 export interface StockDetail extends Stock {

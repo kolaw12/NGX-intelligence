@@ -862,33 +862,47 @@ def label_to_number(label):
     else:
         return 0.0
     
-def aggregate_one_stock(ticker, headlines_for_ticker):
+def aggregate_one_stock(ticker, items):
     """
-    Updated version with:
-    - Confidence penalty for low headline counts
-    - Adjusted signal thresholds
+    Accepts either raw headline strings or article dicts.
+    Returns sentiment report with per-item breakdown for frontend display.
     """
 
-    if not headlines_for_ticker:
+    if not items:
         return {
             "ticker"         : ticker,
             "final_score"    : 0.0,
             "signal"         : "NEUTRAL",
             "headline_count" : 0,
-            "breakdown"      : []
+            "breakdown"      : [],
+            "positive_count" : 0,
+            "negative_count" : 0,
+            "neutral_count"  : 0,
         }
 
     weighted_scores = []
     weights         = []
     breakdown       = []
+    positive_count  = 0
+    negative_count  = 0
+    neutral_count   = 0
 
-    for headline in headlines_for_ticker:
+    for item in items:
+        if isinstance(item, dict):
+            headline_text = item.get("text_for_sentiment", "")
+            source = item.get("source", "")
+            url = item.get("url", "")
+            original_headline = item.get("original_headline", "")
+        else:
+            headline_text = str(item)
+            source = ""
+            url = ""
+            original_headline = str(item)
 
-        result     = process_headline(headline)
+        result     = process_headline(headline_text)
         label      = result['sentiment']
         confidence = result['confidence']
 
-        # Make sure confidence is in decimal form
         if confidence > 1:
             confidence = confidence / 100
 
@@ -897,28 +911,28 @@ def aggregate_one_stock(ticker, headlines_for_ticker):
         weighted_scores.append(numeric * confidence)
         weights.append(confidence)
 
+        if label == "positive":
+            positive_count += 1
+        elif label == "negative":
+            negative_count += 1
+        else:
+            neutral_count += 1
+
         breakdown.append({
-            "headline"  : headline[:80],
-            "sentiment" : label,
-            "confidence": round(confidence * 100, 1),
-            "score"     : round(numeric * confidence, 4)
+            "original_headline"    : result['original'],
+            "headline"             : (original_headline or result['original'])[:100],
+            "sentiment"            : label,
+            "confidence"           : round(confidence * 100, 1),
+            "score"                : round(numeric * confidence, 4),
+            "source"               : source,
+            "url"                  : url,
+            "article_text_preview" : "",
         })
 
-    # Calculate raw weighted average
     total_weight = sum(weights)
     raw_score    = sum(weighted_scores) / total_weight
 
-    # ─────────────────────────────────────────
-    # FIX A — Confidence penalty for thin data
-    # The fewer headlines we have, the more we
-    # pull the score toward 0 (neutral/uncertain)
-    #
-    # 1 headline  → 40% penalty (score × 0.60)
-    # 2 headlines → 20% penalty (score × 0.80)
-    # 3 headlines → 10% penalty (score × 0.90)
-    # 4+ headlines → no penalty (score × 1.00)
-    # ─────────────────────────────────────────
-    count = len(headlines_for_ticker)
+    count = len(items)
 
     if count == 1:
         confidence_multiplier = 0.60
@@ -931,12 +945,6 @@ def aggregate_one_stock(ticker, headlines_for_ticker):
 
     final_score = round(raw_score * confidence_multiplier, 4)
 
-    # ─────────────────────────────────────────
-    # FIX B — Adjusted signal thresholds
-    # Slightly wider NEUTRAL band means we only
-    # fire POSITIVE or NEGATIVE when we're 
-    # genuinely confident in the signal
-    # ─────────────────────────────────────────
     if final_score >= 0.35:
         signal = "POSITIVE"
     elif final_score <= -0.35:
@@ -949,7 +957,10 @@ def aggregate_one_stock(ticker, headlines_for_ticker):
         "final_score"    : final_score,
         "signal"         : signal,
         "headline_count" : count,
-        "breakdown"      : breakdown
+        "breakdown"      : breakdown,
+        "positive_count" : positive_count,
+        "negative_count" : negative_count,
+        "neutral_count"  : neutral_count,
     }
 
 # ============================================
@@ -1032,8 +1043,8 @@ def load_all_news(since_days_ago=14):
 
     if not parquet_files:
         print("  No fetcher output found.")
-        print("  Run the news fetchers first, for example:")
-        print("  python -m data.pipeline news")
+        print("  Run the scraping team's fetchers first, or")
+        print("  run create_mock_data.py to generate test data.")
         return pd.DataFrame()
     
     for parquet_file in parquet_files:
@@ -1091,28 +1102,25 @@ def prepare_articles(df):
         headline     = str(row.get("headline", "")).strip()
         article_text = str(row.get("article_text", "")).strip()
         ticker_mode  = row.get("ticker_mode", "needs_tagging")
-        source       = row.get("source", "unknown")
+        source       = str(row.get("source", "unknown")).strip()
+        url          = str(row.get("url", "")).strip()
+        published_at = row.get("published_date")
 
-        # Skip rows with no headline
         if not headline or headline == "nan":
             continue
 
-        # ── Build text for sentiment analysis ──
         if article_text and article_text != "nan":
             body_preview        = article_text[:500]
             text_for_sentiment  = f"{headline}. {headline}. {body_preview}"
         else:
             text_for_sentiment = headline
 
-        # ── Determine tickers ──
         if ticker_mode == "pre_tagged":
             raw_tickers = row.get("mentioned_tickers", [])
 
-            # Handle numpy array
             if hasattr(raw_tickers, 'tolist'):
                 raw_tickers = raw_tickers.tolist()
 
-            # Handle string
             if isinstance(raw_tickers, str):
                 import ast
                 try:
@@ -1120,17 +1128,14 @@ def prepare_articles(df):
                 except Exception:
                     raw_tickers = []
 
-            # Handle None
             if raw_tickers is None:
                 raw_tickers = []
 
             tickers = list(raw_tickers) if len(raw_tickers) > 0 else []
 
         else:
-            # Run our keyword detection on the headline
             tickers = find_tickers(headline)
 
-        # Tag sector theme for articles with no ticker
         if not tickers:
             themes = tag_sector_theme(headline, article_text)
         else:
@@ -1142,6 +1147,9 @@ def prepare_articles(df):
             "tickers"           : tickers,
             "themes"            : themes,
             "source"            : source,
+            "url"               : url,
+            "published_date"    : published_at,
+            "article_text"      : article_text,
         })
 
     print(f"  {len(prepared)} articles prepared for sentiment analysis")
@@ -1158,11 +1166,7 @@ def prepare_articles(df):
 # ============================================
 
 def run_daily_aggregator_v2(prepared_articles, date=None):
-    """
-    Updated aggregator that works with the
-    prepared article dicts from prepare_articles().
-    Everything else stays the same as before.
-    """
+    """Updated aggregator with momentum tracking and article detail preservation."""
 
     from datetime import datetime
     if date is None:
@@ -1174,71 +1178,70 @@ def run_daily_aggregator_v2(prepared_articles, date=None):
     print(f"  Total articles: {len(prepared_articles)}")
     print(f"{'=' * 60}\n")
 
-    # Group articles by ticker
-    grouped = {}  # ticker → list of text_for_sentiment strings
-    macro   = []  # no ticker found
+    grouped = {}
+    macro   = []
 
     for article in prepared_articles:
         tickers = article['tickers']
         text    = article['text_for_sentiment']
 
         if not tickers:
-            macro.append(text)
+            macro.append(article)
         else:
             for ticker in tickers:
                 if ticker not in grouped:
                     grouped[ticker] = []
-                grouped[ticker].append(text)
+                grouped[ticker].append(article)
 
     print(f"  Stocks with coverage today : {len(grouped)}")
     print(f"  Macro/general articles     : {len(macro)}")
     print(f"\n  Processing...\n")
 
-    # Aggregate sentiment per stock
     stock_reports = []
-    for ticker, texts in grouped.items():
-        report = aggregate_one_stock(ticker, texts)
+    for ticker, articles in grouped.items():
+        report = aggregate_one_stock(ticker, articles)
+        momentum = compute_ticker_momentum(ticker, report['final_score'])
+        report.update(momentum)
         stock_reports.append(report)
 
     stock_reports.sort(key=lambda x: x['final_score'], reverse=True)
 
-    # ── Aggregate by sector theme ──
-    themed = {}   # theme → list of texts
-
+    themed = {}
     for article in prepared_articles:
         themes = article.get('themes', [])
-        text   = article['text_for_sentiment']
-
         for theme in themes:
             if theme not in themed:
                 themed[theme] = []
-            themed[theme].append(text)
+            themed[theme].append(article)
 
-    # Aggregate sentiment per theme
     theme_reports = []
-    for theme, texts in themed.items():
-        report = aggregate_one_stock(theme, texts)
+    for theme, articles in themed.items():
+        report = aggregate_one_stock(theme, articles)
+        momentum = compute_ticker_momentum(theme, report['final_score'])
+        report.update(momentum)
         theme_reports.append(report)
 
     theme_reports.sort(key=lambda x: x['final_score'], reverse=True)
 
-
-    # Aggregate macro headlines
     macro_score = None
     if macro:
         macro_score = aggregate_one_stock("MARKET_WIDE", macro)
+        momentum = compute_ticker_momentum("MARKET_WIDE", macro_score['final_score'])
+        macro_score.update(momentum)
 
-    # Print the report table
     print(f"{'─' * 60}")
-    print(f"  {'TICKER':<12} {'SCORE':>8}  {'SIGNAL':<10} {'ARTICLES':>10}")
+    print(f"  {'TICKER':<12} {'SCORE':>8}  {'MOMENTUM':<12} {'SIGNAL':<10} {'ARTICLES':>10}")
     print(f"{'─' * 60}")
 
     for r in stock_reports:
         arrow = "▲" if r['signal'] == "POSITIVE" else \
                 "▼" if r['signal'] == "NEGATIVE" else "─"
+        mom_arrow = "↑" if r.get('trend_direction') == "up" else \
+                    "↓" if r.get('trend_direction') == "down" else "→"
         print(
             f"  {r['ticker']:<12} "
             f"{r['final_score']:>8.4f}  "
+            f"{mom_arrow} {str(r.get('momentum_signal', 'NEUTRAL')):<12} "
             f"{arrow} {r['signal']:<10} "
             f"{r['headline_count']:>5} article(s)"
         )
@@ -1246,52 +1249,39 @@ def run_daily_aggregator_v2(prepared_articles, date=None):
     if macro_score:
         arrow = "▲" if macro_score['signal'] == "POSITIVE" else \
                 "▼" if macro_score['signal'] == "NEGATIVE" else "─"
+        mom_arrow = "↑" if macro_score.get('trend_direction') == "up" else \
+                    "↓" if macro_score.get('trend_direction') == "down" else "→"
         print(f"{'─' * 60}")
         print(
             f"  {'MARKET_WIDE':<12} "
             f"{macro_score['final_score']:>8.4f}  "
+            f"{mom_arrow} {str(macro_score.get('momentum_signal', 'NEUTRAL')):<12} "
             f"{arrow} {macro_score['signal']:<10} "
             f"{macro_score['headline_count']:>5} article(s)"
         )
 
     print(f"{'─' * 60}")
 
-    # ── Aggregate by sector theme ──
-    themed = {}
-
-    for article in prepared_articles:
-        themes = article.get('themes', [])
-        text   = article['text_for_sentiment']
-        for theme in themes:
-            if theme not in themed:
-                themed[theme] = []
-            themed[theme].append(text)
-
-    theme_reports = []
-    for theme, texts in themed.items():
-        report = aggregate_one_stock(theme, texts)
-        theme_reports.append(report)
-
-    theme_reports.sort(key=lambda x: x['final_score'], reverse=True)
-
     if theme_reports:
         print(f"\n{'─' * 60}")
         print(f"  SECTOR & THEME SENTIMENT")
         print(f"{'─' * 60}")
-        print(f"  {'THEME':<22} {'SCORE':>8}  {'SIGNAL':<10} {'ARTICLES':>8}")
+        print(f"  {'THEME':<22} {'SCORE':>8}  {'MOMENTUM':<12} {'SIGNAL':<10} {'ARTICLES':>8}")
         print(f"{'─' * 60}")
 
         for r in theme_reports:
             arrow = "▲" if r['signal'] == "POSITIVE" else \
                     "▼" if r['signal'] == "NEGATIVE" else "─"
+            mom_arrow = "↑" if r.get('trend_direction') == "up" else \
+                        "↓" if r.get('trend_direction') == "down" else "→"
             print(
                 f"  {r['ticker']:<22} "
                 f"{r['final_score']:>8.4f}  "
+                f"{mom_arrow} {str(r.get('momentum_signal', 'NEUTRAL')):<12} "
                 f"{arrow} {r['signal']:<10} "
                 f"{r['headline_count']:>5} article(s)"
             )
 
-    # Add theme_reports to the return value
     return {
         "date"          : date,
         "stock_scores"  : stock_reports,
@@ -1374,7 +1364,7 @@ def load_macro_data():
 def export_for_backend(daily_report, include_macro=True):
     """
     Exports the complete daily package for the backend team.
-    Includes sentiment scores + macro indicators in one JSON file.
+    Includes sentiment scores + macro indicators + momentum + rolling averages.
     """
 
     package = {
@@ -1388,37 +1378,48 @@ def export_for_backend(daily_report, include_macro=True):
                 "sentiment_score": s['final_score'],
                 "signal"         : s['signal'],
                 "article_count"  : s['headline_count'],
+                "momentum"       : s.get('momentum', 0.0),
+                "momentum_signal": s.get('momentum_signal', 'NEUTRAL'),
+                "rolling_avg_7d" : s.get('rolling_avg_7d'),
+                "rolling_avg_30d": s.get('rolling_avg_30d'),
+                "trend_direction": s.get('trend_direction', 'flat'),
             }
             for s in daily_report['stock_scores']
         ],
-        # Add to the package dictionary
-"theme_sentiments": [
-    {
-        "theme"          : r['ticker'],
-        "sentiment_score": r['final_score'],
-        "signal"         : r['signal'],
-        "article_count"  : r['headline_count'],
-    }
-    for r in theme_reports
-] if 'theme_reports' in dir() else [],
+
+        "theme_sentiments": [
+            {
+                "theme"          : r['ticker'],
+                "sentiment_score": r['final_score'],
+                "signal"         : r['signal'],
+                "article_count"  : r['headline_count'],
+                "momentum"       : r.get('momentum', 0.0),
+                "momentum_signal": r.get('momentum_signal', 'NEUTRAL'),
+                "rolling_avg_7d" : r.get('rolling_avg_7d'),
+                "rolling_avg_30d": r.get('rolling_avg_30d'),
+                "trend_direction": r.get('trend_direction', 'flat'),
+            }
+            for r in daily_report.get('theme_reports', [])
+        ],
 
         "market_sentiment": {
             "score"        : daily_report['macro_score']['final_score'],
             "signal"       : daily_report['macro_score']['signal'],
             "article_count": daily_report['macro_score']['headline_count'],
+            "momentum"     : daily_report['macro_score'].get('momentum', 0.0),
+            "momentum_signal": daily_report['macro_score'].get('momentum_signal', 'NEUTRAL'),
+            "rolling_avg_7d": daily_report['macro_score'].get('rolling_avg_7d'),
+            "rolling_avg_30d": daily_report['macro_score'].get('rolling_avg_30d'),
         } if daily_report.get('macro_score') else None,
 
         "macro_indicators": {}
     }
     
-
-    # Add macro data if requested
     if include_macro:
         print("  Loading macro indicators...")
         macro_data = load_macro_data()
         package["macro_indicators"] = macro_data
 
-    # Save to JSON file
     filename = f"nupat_daily_package_{daily_report['date']}.json"
     with open(filename, 'w') as f:
         json.dump(package, f, indent=4)
@@ -1427,7 +1428,279 @@ def export_for_backend(daily_report, include_macro=True):
     print(f"  Stocks covered   : {len(package['stock_sentiments'])}")
     print(f"  Macro indicators : {len(package['macro_indicators'])}")
 
+    # Also persist historical sentiment for momentum calculations
+    _persist_historical_sentiment(daily_report)
+
     return package
+
+
+HISTORICAL_SENTIMENT_PATH = Path(__file__).resolve().parents[3] / "data" / "output" / "processed" / "news" / "historical_sentiment.parquet"
+
+
+def _persist_historical_sentiment(daily_report: dict) -> None:
+    """Append today's sentiment scores to the historical parquet for momentum tracking."""
+
+    rows = []
+    today = daily_report['date']
+
+    for s in daily_report.get('stock_scores', []):
+        rows.append({
+            "date"           : today,
+            "ticker"         : s['ticker'],
+            "sentiment_score": s['final_score'],
+            "signal"         : s['signal'],
+            "article_count"  : s['headline_count'],
+            "category"       : "stock",
+        })
+
+    for r in daily_report.get('theme_reports', []):
+        rows.append({
+            "date"           : today,
+            "ticker"         : r['ticker'],
+            "sentiment_score": r['final_score'],
+            "signal"         : r['signal'],
+            "article_count"  : r['headline_count'],
+            "category"       : "theme",
+        })
+
+    macro = daily_report.get('macro_score')
+    if macro:
+        rows.append({
+            "date"           : today,
+            "ticker"         : "MARKET_WIDE",
+            "sentiment_score": macro['final_score'],
+            "signal"         : macro.get('signal', 'NEUTRAL'),
+            "article_count"  : macro.get('headline_count', 0),
+            "category"       : "market",
+        })
+
+    if not rows:
+        return
+
+    df_new = pd.DataFrame(rows)
+    df_new["date"] = pd.to_datetime(df_new["date"])
+
+    if HISTORICAL_SENTIMENT_PATH.exists():
+        try:
+            df_existing = pd.read_parquet(HISTORICAL_SENTIMENT_PATH)
+            df_existing["date"] = pd.to_datetime(df_existing["date"], errors="coerce")
+            df_existing = df_existing.dropna(subset=["date"])
+            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+            df_combined = df_combined.drop_duplicates(subset=["date", "ticker", "category"], keep="last")
+        except Exception as exc:
+            print(f"  Warning: could not read historical parquet ({exc}); starting fresh")
+            df_combined = df_new
+    else:
+        HISTORICAL_SENTIMENT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        df_combined = df_new
+
+    df_combined = df_combined.sort_values(["ticker", "category", "date"]).reset_index(drop=True)
+    df_combined.to_parquet(HISTORICAL_SENTIMENT_PATH, index=False)
+    print(f"  Historical sentiment persisted: {len(df_combined)} total rows")
+
+
+def load_historical_sentiment(ticker: str | None = None, category: str = "stock") -> pd.DataFrame:
+    """Load historical sentiment data for momentum / rolling-average calculations."""
+
+    if not HISTORICAL_SENTIMENT_PATH.exists():
+        return pd.DataFrame(columns=["date", "ticker", "sentiment_score", "signal", "article_count", "category"])
+
+    try:
+        df = pd.read_parquet(HISTORICAL_SENTIMENT_PATH)
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.dropna(subset=["date"])
+        df = df[df["category"] == category]
+        if ticker:
+            df = df[df["ticker"].str.upper() == ticker.upper()]
+        return df.sort_values("date").reset_index(drop=True)
+    except Exception as exc:
+        print(f"  Warning: failed to load historical sentiment ({exc})")
+        return pd.DataFrame(columns=["date", "ticker", "sentiment_score", "signal", "article_count", "category"])
+
+
+def compute_ticker_momentum(ticker: str, today_score: float, window_short: int = 2, window_long: int = 7) -> dict:
+    """
+    Compute sentiment momentum and rolling averages for a ticker.
+    
+    momentum > 0  → sentiment is improving (rising)
+    momentum < 0  → sentiment is declining (falling)
+    momentum ≈ 0  → flat / no clear trend
+    """
+    hist = load_historical_sentiment(ticker=ticker, category="stock")
+    if hist.empty:
+        return {
+            "momentum"       : 0.0,
+            "momentum_signal": "NEUTRAL",
+            "rolling_avg_7d" : round(today_score, 4),
+            "rolling_avg_30d": round(today_score, 4),
+            "trend_direction": "flat",
+            "days_of_history": 0,
+        }
+
+    hist = hist.sort_values("date")
+    scores = hist["sentiment_score"].tail(max(window_long, 30))
+
+    rolling_7d = float(scores.tail(window_short).mean()) if len(scores) >= window_short else today_score
+    rolling_30d = float(scores.tail(window_long).mean()) if len(scores) >= window_long else today_score
+
+    if len(scores) >= window_short:
+        recent = float(scores.tail(window_short).mean())
+        previous = float(scores.tail(window_short * 2).head(window_short).mean()) if len(scores) >= window_short * 2 else recent
+        momentum = round(recent - previous, 4)
+    else:
+        momentum = 0.0
+
+    if momentum > 0.10:
+        momentum_signal = "ACCELERATING_POSITIVE"
+        trend_direction = "up"
+    elif momentum > 0.02:
+        momentum_signal = "IMPROVING"
+        trend_direction = "up"
+    elif momentum < -0.10:
+        momentum_signal = "ACCELERATING_NEGATIVE"
+        trend_direction = "down"
+    elif momentum < -0.02:
+        momentum_signal = "DECLINING"
+        trend_direction = "down"
+    else:
+        momentum_signal = "NEUTRAL"
+        trend_direction = "flat"
+
+    return {
+        "momentum"       : momentum,
+        "momentum_signal": momentum_signal,
+        "rolling_avg_7d" : round(rolling_7d, 4),
+        "rolling_avg_30d": round(rolling_30d, 4),
+        "trend_direction": trend_direction,
+        "days_of_history": int(len(hist)),
+    }
+
+
+def run_daily_aggregator_v2(prepared_articles, date=None):
+    """Updated aggregator with momentum tracking."""
+
+    from datetime import datetime
+    if date is None:
+        date = datetime.today().strftime('%Y-%m-%d')
+
+    print(f"\n{'=' * 60}")
+    print(f"  NUPAT AI — DAILY SENTIMENT REPORT")
+    print(f"  Date: {date}")
+    print(f"  Total articles: {len(prepared_articles)}")
+    print(f"{'=' * 60}\n")
+
+    grouped = {}
+    macro   = []
+
+    for article in prepared_articles:
+        tickers = article['tickers']
+        text    = article['text_for_sentiment']
+
+        if not tickers:
+            macro.append(text)
+        else:
+            for ticker in tickers:
+                if ticker not in grouped:
+                    grouped[ticker] = []
+                grouped[ticker].append(text)
+
+    print(f"  Stocks with coverage today : {len(grouped)}")
+    print(f"  Macro/general articles     : {len(macro)}")
+    print(f"\n  Processing...\n")
+
+    stock_reports = []
+    for ticker, texts in grouped.items():
+        report = aggregate_one_stock(ticker, texts)
+        momentum = compute_ticker_momentum(ticker, report['final_score'])
+        report.update(momentum)
+        stock_reports.append(report)
+
+    stock_reports.sort(key=lambda x: x['final_score'], reverse=True)
+
+    themed = {}
+    for article in prepared_articles:
+        themes = article.get('themes', [])
+        text   = article['text_for_sentiment']
+        for theme in themes:
+            if theme not in themed:
+                themed[theme] = []
+            themed[theme].append(text)
+
+    theme_reports = []
+    for theme, texts in themed.items():
+        report = aggregate_one_stock(theme, texts)
+        momentum = compute_ticker_momentum(theme, report['final_score'])
+        report.update(momentum)
+        theme_reports.append(report)
+
+    theme_reports.sort(key=lambda x: x['final_score'], reverse=True)
+
+    macro_score = None
+    if macro:
+        macro_score = aggregate_one_stock("MARKET_WIDE", macro)
+        momentum = compute_ticker_momentum("MARKET_WIDE", macro_score['final_score'])
+        macro_score.update(momentum)
+
+    print(f"{'─' * 60}")
+    print(f"  {'TICKER':<12} {'SCORE':>8}  {'MOMENTUM':<12} {'SIGNAL':<10} {'ARTICLES':>10}")
+    print(f"{'─' * 60}")
+
+    for r in stock_reports:
+        arrow = "▲" if r['signal'] == "POSITIVE" else \
+                "▼" if r['signal'] == "NEGATIVE" else "─"
+        mom_arrow = "↑" if r.get('trend_direction') == "up" else \
+                    "↓" if r.get('trend_direction') == "down" else "→"
+        print(
+            f"  {r['ticker']:<12} "
+            f"{r['final_score']:>8.4f}  "
+            f"{mom_arrow} {str(r.get('momentum_signal', 'NEUTRAL')):<12} "
+            f"{arrow} {r['signal']:<10} "
+            f"{r['headline_count']:>5} article(s)"
+        )
+
+    if macro_score:
+        arrow = "▲" if macro_score['signal'] == "POSITIVE" else \
+                "▼" if macro_score['signal'] == "NEGATIVE" else "─"
+        mom_arrow = "↑" if macro_score.get('trend_direction') == "up" else \
+                    "↓" if macro_score.get('trend_direction') == "down" else "→"
+        print(f"{'─' * 60}")
+        print(
+            f"  {'MARKET_WIDE':<12} "
+            f"{macro_score['final_score']:>8.4f}  "
+            f"{mom_arrow} {str(macro_score.get('momentum_signal', 'NEUTRAL')):<12} "
+            f"{arrow} {macro_score['signal']:<10} "
+            f"{macro_score['headline_count']:>5} article(s)"
+        )
+
+    print(f"{'─' * 60}")
+
+    if theme_reports:
+        print(f"\n{'─' * 60}")
+        print(f"  SECTOR & THEME SENTIMENT")
+        print(f"{'─' * 60}")
+        print(f"  {'THEME':<22} {'SCORE':>8}  {'MOMENTUM':<12} {'SIGNAL':<10} {'ARTICLES':>8}")
+        print(f"{'─' * 60}")
+
+        for r in theme_reports:
+            arrow = "▲" if r['signal'] == "POSITIVE" else \
+                    "▼" if r['signal'] == "NEGATIVE" else "─"
+            mom_arrow = "↑" if r.get('trend_direction') == "up" else \
+                        "↓" if r.get('trend_direction') == "down" else "→"
+            print(
+                f"  {r['ticker']:<22} "
+                f"{r['final_score']:>8.4f}  "
+                f"{mom_arrow} {str(r.get('momentum_signal', 'NEUTRAL')):<12} "
+                f"{arrow} {r['signal']:<10} "
+                f"{r['headline_count']:>5} article(s)"
+            )
+
+    return {
+        "date"          : date,
+        "stock_scores"  : stock_reports,
+        "macro_score"   : macro_score,
+        "theme_reports" : theme_reports,
+        "total_articles": len(prepared_articles)
+    }
 
 
 def run_pipeline(since_days_ago=14):
@@ -1454,8 +1727,8 @@ def run_pipeline(since_days_ago=14):
     df = load_all_news(since_days_ago=since_days_ago)
 
     if df.empty:
-        print("No articles found. Run the real news fetch pipeline first.")
-        print("Example: python -m data.pipeline news")
+        print("No articles found. Check that mock or real data exists.")
+        print("Run create_mock_data.py to generate test data.")
         return None
 
     # ── Step 2 — Prepare articles for sentiment analysis ──

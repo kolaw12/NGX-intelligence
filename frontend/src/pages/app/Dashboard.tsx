@@ -374,6 +374,12 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <p className="rounded-lg border border-border/50 bg-surface-elevated/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+        <span className="font-semibold text-foreground">Disclaimer:</span> This platform provides AI-assisted market analysis for
+        educational and decision-support purposes only. It does not constitute financial advice. Investors should conduct their
+        own research or consult a licensed financial adviser before making investment decisions.
+      </p>
     </div>
   );
 }

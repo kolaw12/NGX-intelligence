@@ -126,23 +126,24 @@ def get_line(symbol: str, range: RangeValue = "1Y") -> list[dict[str, object]]:
 
 @router.get("/{symbol}/peers")
 def get_peers(symbol: str) -> list[dict[str, object]]:
-    """Return same-sector peer stocks."""
+    """Return same-sector peer stocks ranked by volume."""
 
     metadata = get_ticker_metadata(symbol)
     target_sector = metadata.get("sector")
-    return [
+    peers = [
         {
             "symbol": row["symbol"],
             "name": row["name"],
             "price": row["price"],
             "changePct": row["changePct"],
-            "marketCap": row["marketCap"],
-            "pe": row["pe"],
+            "volume": row["volume"],
+            "riskScore": row["riskScore"],
             "aiOutlook": row["aiOutlook"],
         }
         for row in list_stocks()
         if row["sector"] == target_sector and row["symbol"] != public_ticker(str(metadata["ticker"]))
-    ][:12]
+    ]
+    return sorted(peers, key=lambda r: float(r["volume"]), reverse=True)[:12]
 
 
 @router.get("/{symbol}/fundamentals")
@@ -186,13 +187,13 @@ def get_fundamentals(symbol: str) -> list[dict[str, object]]:
         },
         {
             "metric": "Price return (market data)",
-            "fy2021": "Unavailable",
-            "fy2022": "Unavailable",
+            "fy2021": "—",
+            "fy2022": "—",
             "fy2023": f"{ytd_return:.2f}% YTD",
             "ttm": f"{daily_return:.2f}% latest",
         },
-        {"metric": "52-week high (market data)", "fy2021": "Unavailable", "fy2022": "Unavailable", "fy2023": "Unavailable", "ttm": round(high_52w, 2)},
-        {"metric": "52-week low (market data)", "fy2021": "Unavailable", "fy2022": "Unavailable", "fy2023": "Unavailable", "ttm": round(low_52w, 2)},
+        {"metric": "52-week high (market data)", "fy2021": "—", "fy2022": "—", "fy2023": "—", "ttm": round(high_52w, 2)},
+        {"metric": "52-week low (market data)", "fy2021": "—", "fy2022": "—", "fy2023": "—", "ttm": round(low_52w, 2)},
     ]
     return financial_table_rows(symbol, price_rows)
 
@@ -210,21 +211,29 @@ def _stock_card(row: pd.Series, include_analysis: bool = False, signals: dict[st
     company = latest_company_record(str(row["ticker"]))
     company_values = company.values
     outlook = signal.outlook if signal else "neutral"
+    beta = _optional_float(company_values.get("beta"))
+    raw_volume = int(_float(row["volume"], 0.0))
     if include_analysis:
         prices = get_ticker_prices(str(row["ticker"]))
         risk_score = signal.risk_score if signal else _quick_risk_score_from_prices(prices, change_pct)
         high_52w = _float(prices["high"].tail(252).max(), close)
         low_52w = _float(prices["low"].tail(252).min(), close)
         sparkline = [round(_float(value), 2) for value in prices["close"].tail(30).tolist()]
+        if beta is None:
+            beta = _compute_beta_from_prices(prices)
+        # Use 20-day median volume so a single spike day doesn't misrepresent liquidity
+        display_volume = _representative_volume(prices, raw_volume)
     else:
         risk_score = _quick_risk_score_from_row(row, change_pct)
         high_52w = _float(row["high"], close)
         low_52w = _float(row["low"], close)
         sparkline = [round(close, 2)]
+        display_volume = raw_volume
     confidence = signal.confidence if signal else 0.0
     if signal and not include_analysis:
         risk_score = signal.risk_score
     sector = str(metadata.get("sector", "Unknown"))
+    sector_rank = _optional_int(company_values.get("sector_rank"))
     return {
         "symbol": public_ticker(str(row["ticker"])),
         "name": str(metadata.get("name", public_ticker(str(row["ticker"])))),
@@ -236,14 +245,14 @@ def _stock_card(row: pd.Series, include_analysis: bool = False, signals: dict[st
         "marketCap": _optional_float(company_values.get("market_cap")),
         "pe": _optional_float(company_values.get("pe")),
         "dividendYield": _optional_float(company_values.get("dividend_yield")),
-        "volume": int(_float(row["volume"], 0.0)),
+        "volume": display_volume,
         "aiOutlook": outlook,
         "confidence": round(confidence),
         "riskScore": risk_score,
-        "sectorRank": _optional_int(company_values.get("sector_rank")),
+        "sectorRank": sector_rank,
         "high52w": round(high_52w, 2),
         "low52w": round(low_52w, 2),
-        "beta": _optional_float(company_values.get("beta")),
+        "beta": beta,
         "sparkline": sparkline,
     }
 
@@ -253,6 +262,22 @@ def _range_prices(prices: pd.DataFrame, range_value: RangeValue) -> pd.DataFrame
 
     points = {"1D": 1, "5D": 5, "1M": 22, "3M": 66, "6M": 130, "1Y": 260, "5Y": 1300, "MAX": len(prices)}
     return prices.tail(points[range_value]).copy()
+
+
+def _representative_volume(prices: pd.DataFrame, raw_volume: int) -> int:
+    """Return a display-safe volume that won't mislead peer comparisons.
+
+    A single corporate-action or block-trade day can push raw volume to 10-100×
+    the stock's normal level. Use the 20-day median as the display value whenever
+    today's raw volume exceeds 5× that median, so the stock table stays comparable.
+    The raw value is still used for the volume-spike risk factor.
+    """
+    if len(prices) < 5:
+        return raw_volume
+    median_20 = float(prices["volume"].tail(20).median())
+    if median_20 > 0 and raw_volume > median_20 * 5:
+        return int(median_20)
+    return raw_volume
 
 
 def _quick_risk_score_from_row(row: pd.Series, change_pct: float) -> float:
@@ -266,11 +291,28 @@ def _quick_risk_score_from_row(row: pd.Series, change_pct: float) -> float:
     return round(max(0.0, min(100.0, score)), 1)
 
 
+def _compute_beta_from_prices(prices: pd.DataFrame) -> float | None:
+    """Approximate beta using annualised volatility relative to typical NGX market volatility.
+
+    Without a matching daily ASI series for every ticker's history this is a
+    single-factor volatility proxy: beta ≈ stock_vol / market_baseline_vol.
+    Values near 1.0 imply market-average risk; above 1.5 is high-beta.
+    """
+    if len(prices) < 30:
+        return None
+    returns = prices["close"].astype(float).pct_change(fill_method=None).dropna().tail(252)
+    if len(returns) < 20:
+        return None
+    annualised_vol = float(returns.std() * np.sqrt(252))
+    market_baseline = 0.18  # approximate NGX market annual volatility
+    beta = annualised_vol / market_baseline
+    return round(max(0.1, min(5.0, beta)), 2)
+
+
 def _quick_risk_score_from_prices(prices: pd.DataFrame, change_pct: float) -> float:
     """Estimate detail-page risk from real recent prices without model feature engineering."""
 
     latest = prices.iloc[-1]
-    close = _float(latest["close"], 0.0)
     intraday = _quick_risk_score_from_row(latest, change_pct)
     returns = prices["close"].astype(float).pct_change(fill_method=None).tail(20)
     volatility = float(returns.std() * np.sqrt(252) * 100) if len(returns.dropna()) >= 5 else 0.0

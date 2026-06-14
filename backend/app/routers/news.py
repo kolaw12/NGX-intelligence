@@ -14,8 +14,11 @@ from app.services.news_sentiment import (
     analyze_text,
     build_daily_sentiment_summary,
     extractive_summary,
+    latest_package_breakdown_for_ticker,
+    latest_package_momentum_for_ticker,
     load_daily_sentiment_summary,
     load_news_articles,
+    load_sentiment_history_for_ticker,
     save_daily_sentiment_summary,
     valid_public_tickers,
 )
@@ -94,6 +97,60 @@ def sentiment_diagnostics() -> dict[str, Any]:
         "latestArticleDate": latest_article_date.isoformat() if pd.notna(latest_article_date) else None,
         "latestSummaryDate": latest_summary_date.date().isoformat() if pd.notna(latest_summary_date) else None,
         "fallbackActive": bool(summary.empty),
+    }
+
+
+@router.get("/news/stock-summary")
+def stock_news_summary(symbol: str = Query(...)) -> dict[str, Any]:
+    """Return enriched sentiment + per-headline breakdown + momentum for one ticker."""
+
+    canonical = canonical_ticker(symbol)
+    public = public_ticker(canonical)
+    momentum = latest_package_momentum_for_ticker(canonical)
+    breakdown = latest_package_breakdown_for_ticker(canonical)
+    history = load_sentiment_history_for_ticker(canonical, days=30)
+
+    history_payload = []
+    if not history.empty:
+        for _, row in history.iterrows():
+            history_payload.append(
+                {
+                    "date"       : row["date"].date().isoformat() if hasattr(row["date"], "date") else str(row["date"]),
+                    "sentiment_score": float(row["sentiment_score"] or 0.0),
+                    "signal"     : str(row.get("signal", "NEUTRAL") or "NEUTRAL"),
+                    "article_count": int(row.get("article_count", 0) or 0),
+                }
+            )
+
+    if not momentum and breakdown is None:
+        articles = load_news_articles()
+        if not articles.empty and "mentioned_tickers" in articles.columns:
+            mask = articles["mentioned_tickers"].apply(
+                lambda tickers: canonical in [str(t).upper() for t in (tickers or [])]
+            )
+            matched = articles[mask]
+            if not matched.empty:
+                matched = matched.sort_values("published_date", ascending=False).head(20)
+                breakdown = [
+                    {
+                        "headline"       : str(row.get("headline", "")),
+                        "originalHeadline": str(row.get("headline", "")),
+                        "sentiment"      : "neutral",
+                        "confidence"     : 0.0,
+                        "score"          : 0.0,
+                        "source"         : str(row.get("source", "")),
+                        "url"            : str(row.get("url", "")),
+                    }
+                    for _, row in matched.iterrows()
+                ]
+
+    return {
+        "symbol"       : public,
+        "ticker"       : canonical,
+        "momentum"     : momentum,
+        "articles"     : breakdown or [],
+        "history"      : history_payload,
+        "fallback"     : momentum is None,
     }
 
 

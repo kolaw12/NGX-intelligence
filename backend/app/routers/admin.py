@@ -2,18 +2,34 @@
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.db.crud import invalidate_all_caches
 from app.db.database import ensure_database_tables, get_db
 from app.db.models import Alert, RecommendationSignal, User, WatchlistItem
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/refresh")
+def refresh_data_cache(x_admin_key: str = Header(...)) -> dict[str, str]:
+    """Clear all in-memory data caches so the next request reloads fresh parquet files.
+
+    Called by GitHub Actions after the daily pipeline completes.
+    Protected by the ADMIN_SECRET environment variable.
+    """
+    expected = os.getenv("ADMIN_SECRET", "")
+    if not expected or x_admin_key != expected:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin key")
+    invalidate_all_caches()
+    return {"status": "cache_cleared", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 class UpdateUserRequest(BaseModel):
@@ -185,6 +201,17 @@ def _aware(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+@router.post("/alerts/check")
+def trigger_alert_check() -> dict[str, Any]:
+    """Manually trigger an immediate alert check cycle.
+
+    Useful after a model update or price data refresh. Returns a summary
+    of how many alerts were checked, triggered, and emailed.
+    """
+    from app.services.alert_checker import check_and_fire_alerts
+    return check_and_fire_alerts()
 
 
 def _ensure_tables() -> None:

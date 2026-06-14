@@ -42,6 +42,8 @@ class RiskProfile:
     drawdown_score: float
     volume_spike: bool
     flags: list[RiskFlag] = field(default_factory=list)
+    regime_alert: bool = False
+    regime_reason: str = ""
 
 
 class RiskAnalyzer:
@@ -49,7 +51,13 @@ class RiskAnalyzer:
 
     EARNINGS_MONTHS = {3, 6, 9, 12}
 
-    def analyse(self, df: pd.DataFrame, ticker: str, macro_df: pd.DataFrame | None = None) -> RiskProfile:
+    def analyse(
+        self,
+        df: pd.DataFrame,
+        ticker: str,
+        macro_df: pd.DataFrame | None = None,
+        sentiment_score: float | None = None,
+    ) -> RiskProfile:
         """Return a risk profile for the latest available row of a ticker.
 
         Args:
@@ -57,11 +65,19 @@ class RiskAnalyzer:
             ticker: NGX ticker to analyze.
             macro_df: Optional macro/index DataFrame with `indicator`, `date`, and
                 `value` columns. `nse_asi_change_pct <= -2` adds 15 risk points.
+            sentiment_score: Optional NLP sentiment score in [-1, 1]. Negative
+                scores add up to 12 risk points; positive scores credit up to 3.
         """
 
-        return self.analyze(df=df, ticker=ticker, macro_df=macro_df)
+        return self.analyze(df=df, ticker=ticker, macro_df=macro_df, sentiment_score=sentiment_score)
 
-    def analyze(self, df: pd.DataFrame, ticker: str, macro_df: pd.DataFrame | None = None) -> RiskProfile:
+    def analyze(
+        self,
+        df: pd.DataFrame,
+        ticker: str,
+        macro_df: pd.DataFrame | None = None,
+        sentiment_score: float | None = None,
+    ) -> RiskProfile:
         """Return a risk profile for the latest available row of a ticker."""
 
         self._validate_input(df)
@@ -176,6 +192,30 @@ class RiskAnalyzer:
                 )
             )
 
+        sentiment_adjustment, sentiment_description = self._sentiment_risk(sentiment_score)
+        score += sentiment_adjustment
+        if sentiment_adjustment != 0:
+            flags.append(
+                RiskFlag(
+                    name="news_sentiment",
+                    impact=sentiment_adjustment,
+                    severity=RiskLevel.HIGH if sentiment_adjustment >= 10 else RiskLevel.MEDIUM if sentiment_adjustment > 0 else RiskLevel.LOW,
+                    description=sentiment_description,
+                )
+            )
+
+        regime_alert, regime_reason, regime_score = self._volatility_regime(latest, stock_df)
+        score += regime_score
+        if regime_alert:
+            flags.append(
+                RiskFlag(
+                    name="volatility_regime",
+                    impact=regime_score,
+                    severity=RiskLevel.HIGH,
+                    description=f"Abnormal market regime: {regime_reason}",
+                )
+            )
+
         final_score = float(np.clip(score, 0, 100))
         risk_level = self._risk_level(final_score)
         if not flags:
@@ -189,12 +229,13 @@ class RiskAnalyzer:
             )
 
         logger.info(
-            "Risk profile for %s on %s: score=%.1f level=%s volatility_flag=%s",
+            "Risk profile for %s on %s: score=%.1f level=%s volatility_flag=%s regime_alert=%s",
             normalized_ticker,
             as_of_date,
             final_score,
             risk_level.value,
             volatility_flag,
+            regime_alert,
         )
         return RiskProfile(
             ticker=normalized_ticker,
@@ -206,6 +247,8 @@ class RiskAnalyzer:
             drawdown_score=round(drawdown_score, 1),
             volume_spike=volume_spike,
             flags=flags,
+            regime_alert=regime_alert,
+            regime_reason=regime_reason,
         )
 
     def _validate_input(self, df: pd.DataFrame) -> None:
@@ -322,6 +365,75 @@ class RiskAnalyzer:
         if ma_gap >= 2.0 and return_20d >= 0:
             return 3.0
         return 0.0
+
+    def _volatility_regime(self, latest: pd.Series, stock_df: pd.DataFrame) -> tuple[bool, str, float]:
+        """Detect abnormal volatility regime from short-term technical signals.
+
+        Returns (alert, human-readable reason, extra risk score to add).
+        A regime alert means the statistical environment the model was trained on
+        has changed — confidence should be reduced even before retraining.
+        """
+        reasons: list[str] = []
+        extra_score = 0.0
+
+        vol_5 = self._float(latest.get("vol_5"), 0.0)
+        if vol_5 >= 0.05:
+            reasons.append(f"5-day realized volatility is extreme ({vol_5:.2%} per day)")
+            extra_score += 18.0
+        elif vol_5 >= 0.035:
+            reasons.append(f"5-day realized volatility is elevated ({vol_5:.2%} per day)")
+            extra_score += 8.0
+
+        if "BB_WIDTH" in stock_df.columns:
+            bb_series = stock_df["BB_WIDTH"].dropna().tail(30)
+            if len(bb_series) >= 10:
+                avg_bb = float(bb_series.mean())
+                curr_bb = self._float(latest.get("BB_WIDTH"), 0.0)
+                if avg_bb > 0:
+                    ratio = curr_bb / avg_bb
+                    if ratio >= 2.5:
+                        reasons.append(f"Bollinger Bands are {ratio:.1f}× their 30-day average — extreme expansion")
+                        extra_score += 14.0
+                    elif ratio >= 1.8:
+                        reasons.append(f"Bollinger Bands are {ratio:.1f}× their 30-day average — rapid expansion")
+                        extra_score += 7.0
+
+        volume_ratio = self._float(latest.get("volume_ratio_20"), 1.0)
+        if volume_ratio >= 5.0:
+            reasons.append(f"Volume is {volume_ratio:.1f}× 20-day average — extreme event-driven trading")
+            extra_score += 14.0
+
+        close = max(self._float(latest.get("close"), 0.0), 0.0001)
+        atr = self._float(latest.get("atr_14"), 0.0)
+        atr_pct = atr / close
+        if atr_pct >= 0.12:
+            reasons.append(f"ATR is {atr_pct:.1%} of price — extreme intraday range")
+            extra_score += 12.0
+
+        alert = extra_score >= 14.0
+        reason_str = "; ".join(reasons)
+        return alert, reason_str, min(extra_score, 25.0)
+
+    def _sentiment_risk(self, sentiment_score: float | None) -> tuple[float, str]:
+        """Adjust risk score based on NLP news sentiment for the ticker.
+
+        Sentiment score is in [-1, 1]. Strongly negative news raises risk because
+        it signals potential adverse events not yet priced in. Positive news earns
+        a small credit. When no sentiment data is available the adjustment is zero.
+        """
+
+        if sentiment_score is None:
+            return 0.0, ""
+        s = float(sentiment_score)
+        if s <= -0.6:
+            return 12.0, f"News sentiment is strongly negative ({s:.2f}), signalling elevated adverse-event risk"
+        if s <= -0.3:
+            return 7.0, f"News sentiment is negative ({s:.2f}), suggesting potential headwinds"
+        if s <= -0.1:
+            return 3.0, f"News sentiment is mildly negative ({s:.2f})"
+        if s >= 0.4:
+            return -3.0, f"News sentiment is positive ({s:.2f}), providing a modest risk credit"
+        return 0.0, ""
 
     def _risk_level(self, risk_score: float) -> RiskLevel:
         """Map risk score into Low, Medium, or High."""

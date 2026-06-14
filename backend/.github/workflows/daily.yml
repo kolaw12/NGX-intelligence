@@ -56,6 +56,20 @@ jobs:
           ARCHIVE_GITHUB: ${{ vars.ARCHIVE_GITHUB }}
         run: python -m data.pipeline daily
 
+      # Stage 6: news ingestion — runs after price so a news failure never
+      # blocks price data from reaching the warehouse.
+      # continue-on-error: true means a broken scraper doesn't fail the whole
+      # workflow and doesn't block the dbt quality gate downstream.
+      - name: Run news pipeline
+        continue-on-error: true
+        env:
+          NEWS_MAX_ARTICLES: ${{ vars.NEWS_MAX_ARTICLES }}
+        run: python -m data.pipeline news
+
+      - name: Build daily sentiment summary
+        continue-on-error: true
+        run: python -m data.pipeline sentiment-summary
+
       # ---- Quality gate (Lane A) — runs only if the pipeline above succeeded.
       # Default GH behavior skips subsequent steps after a failure, which is
       # what we want: a broken scrape shouldn't drown in quality-test noise

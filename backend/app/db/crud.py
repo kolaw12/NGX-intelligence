@@ -22,6 +22,17 @@ from app.utils.enums import RecommendationAction, RiskLevel, SignalStrength
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def invalidate_all_caches() -> None:
+    """Clear all in-memory data caches so the next request reloads from disk."""
+    load_prices.cache_clear()
+    load_tickers.cache_clear()
+    load_macro_asi.cache_clear()
+    get_ticker_prices.cache_clear()
+    _latest_by_ticker_from_partitioned_files.cache_clear()
+    logger.info("All data caches cleared; next request will reload from disk")
+
 PRICE_DATA_PATH = PROJECT_ROOT / "data" / "output" / "processed" / "prices" / "historical_consolidated.parquet"
 HISTORICAL_PRICE_DIR = PROJECT_ROOT / "data" / "output" / "processed" / "prices" / "historical"
 TICKERS_PATH = PROJECT_ROOT / "data" / "master" / "tickers.csv"
@@ -41,17 +52,21 @@ TICKER_ALIASES = {
 CANONICAL_TO_PUBLIC = {value: key for key, value in TICKER_ALIASES.items()}
 
 
-def canonical_ticker(ticker: str) -> str:
+def canonical_ticker(ticker: object) -> str:
     """Map public frontend symbols to data-layer ticker codes."""
 
-    normalized = ticker.upper().strip()
+    if not ticker or (isinstance(ticker, float)):
+        return ""
+    normalized = str(ticker).upper().strip()
     return TICKER_ALIASES.get(normalized, normalized)
 
 
-def public_ticker(ticker: str) -> str:
+def public_ticker(ticker: object) -> str:
     """Map data-layer ticker codes to public symbols where known."""
 
-    normalized = ticker.upper().strip()
+    if not ticker or (isinstance(ticker, float)):
+        return ""
+    normalized = str(ticker).upper().strip()
     return CANONICAL_TO_PUBLIC.get(normalized, normalized)
 
 

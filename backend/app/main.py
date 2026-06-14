@@ -6,6 +6,7 @@ routes so the existing React frontend can consume live backend data.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -17,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from app.routers import account, admin, auth, engine, market, news, predict, recommendations, stocks, user_data
+from app.routers import account, admin, auth, company, engine, market, news, predict, recommendations, stocks, user_data
 from app.db.database import Base, engine as db_engine, init_dev_database
 from app.db import models  # noqa: F401 - register ORM tables for create_all.
 from app.services.backend_model_config import get_backend_model_config
@@ -61,7 +62,7 @@ def create_app() -> FastAPI:
         allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "X-Admin-Key"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
@@ -92,9 +93,11 @@ def create_app() -> FastAPI:
         return response
     app.include_router(stocks.router)
     app.include_router(recommendations.router)
+    app.include_router(company.router)
     app.include_router(news.router)
     app.include_router(engine.router)
     app.include_router(engine.router, prefix="/api")
+    app.include_router(company.router, prefix="/api")
     app.include_router(predict.router, prefix="/api")
     app.include_router(auth.router)
     app.include_router(account.router)
@@ -103,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(user_data.router)
     app.include_router(stocks.router, prefix="/api/v1")
     app.include_router(recommendations.router, prefix="/api/v1")
+    app.include_router(company.router, prefix="/api/v1")
     app.include_router(news.router, prefix="/api/v1")
     app.include_router(engine.router, prefix="/api/v1")
     app.include_router(predict.router, prefix="/api/v1")
@@ -114,7 +118,7 @@ def create_app() -> FastAPI:
     logger.info("NGX AI Advisor API configured with CORS origins: %s", allowed_origins)
 
     @app.on_event("startup")
-    def _startup() -> None:
+    async def _startup() -> None:
         """Initialize local development tables; production should run Alembic."""
 
         env = os.getenv("ENV", os.getenv("APP_ENV", "development")).lower()
@@ -123,7 +127,8 @@ def create_app() -> FastAPI:
         elif os.getenv("AUTO_CREATE_TABLES", "1").strip().lower() in {"1", "true", "yes"}:
             logger.warning("AUTO_CREATE_TABLES enabled; creating any missing production tables")
             Base.metadata.create_all(bind=db_engine)
-        if os.getenv("WARMUP_XGBOOST", "0").strip().lower() in {"1", "true", "yes"}:
+        skip_warmup = os.getenv("WARMUP_XGBOOST", "1").strip().lower() in {"0", "false", "no"}
+        if not skip_warmup:
             try:
                 metadata = warmup_xgboost()
                 config = get_backend_model_config()
@@ -137,7 +142,12 @@ def create_app() -> FastAPI:
             except Exception as exc:
                 logger.error("XGBoost startup warmup failed: %s", exc)
         else:
-            logger.info("Skipping XGBoost startup warmup; model loads lazily on first model request")
+            logger.info("Skipping XGBoost startup warmup (WARMUP_XGBOOST=0); model loads lazily")
+
+        if os.getenv("DISABLE_ALERT_CHECKER", "0").strip().lower() not in {"1", "true", "yes"}:
+            from app.services.alert_checker import alert_checker_loop
+            asyncio.create_task(alert_checker_loop())
+            logger.info("Alert checker background task started")
 
     return app
 

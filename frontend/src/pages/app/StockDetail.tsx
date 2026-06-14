@@ -1,6 +1,6 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, BellRing, Plus, Check, Building2, Globe, Users, CalendarDays } from "lucide-react";
+import { ArrowLeft, BellRing, Plus, Check, Building2, Globe, Users, CalendarDays, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useStock, useStockOHLC, useStockFundamentals, useStockPeers } from "@/hooks/useStock";
 import { useAIInsight, useNews } from "@/hooks/useAIInsights";
@@ -121,8 +121,11 @@ export default function StockDetail() {
             <div className="flex items-end gap-6">
               <div>
                 <Price value={stock.data.price} size="xl" />
-                <div className="mt-1">
+                <div className="mt-1 flex items-center gap-3">
                   <ChangeText value={stock.data.changePct} variant="both" />
+                  {stock.data.dataAsOf && (
+                    <span className="text-[10px] text-muted-foreground">as of {stock.data.dataAsOf}</span>
+                  )}
                 </div>
               </div>
               <div className="hidden lg:block min-w-[160px]">
@@ -146,6 +149,39 @@ export default function StockDetail() {
           </div>
         )}
       </div>
+
+      {/* Event severity / regime alert banner */}
+      {insight.data && (insight.data.regimeAlert || (insight.data.eventSeverity && insight.data.eventSeverity !== "NORMAL")) && (
+        <div
+          className={cn(
+            "flex items-start gap-3 rounded-lg border px-4 py-3 text-sm",
+            insight.data.eventSeverity === "CRITICAL"
+              ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+          )}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-semibold">
+              {insight.data.eventSeverity === "CRITICAL"
+                ? "Critical market event detected"
+                : insight.data.regimeAlert
+                  ? "Abnormal volatility regime"
+                  : "High-impact news event detected"}
+            </p>
+            <p className="mt-0.5 text-xs opacity-80">
+              {insight.data.eventAlerts?.[0]?.replace(/^'|'$/g, "") ??
+                insight.data.regimeReason ??
+                "Unusual market conditions detected. Model confidence is reduced until conditions normalise."}
+            </p>
+            {insight.data.eventSeverity === "CRITICAL" && (
+              <p className="mt-1 text-xs font-medium opacity-90">
+                All directional signals are suspended. Do not act on BUY or SELL until this event resolves.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-5">
         <TabsList>
@@ -202,12 +238,12 @@ export default function StockDetail() {
                   <>
                     <Stat label="Market cap" value={<Compact value={stock.data.marketCap} prefix="₦" />} />
                     <Stat label="P/E (TTM)" value={formatNullable(stock.data.pe)} />
-                    <Stat label="Dividend yield" value={stock.data.dividendYield === null ? "Unavailable" : `${stock.data.dividendYield.toFixed(2)}%`} />
+                    <Stat label="Dividend yield" value={stock.data.dividendYield === null ? "—" : `${stock.data.dividendYield.toFixed(2)}%`} />
                     <Stat label="Beta" value={formatNullable(stock.data.beta)} />
                     <Stat label="52w high" value={`₦${stock.data.high52w.toFixed(2)}`} />
                     <Stat label="52w low" value={`₦${stock.data.low52w.toFixed(2)}`} />
                     <Stat label="Volume" value={<Compact value={stock.data.volume} />} />
-                    <Stat label="Sector rank" value={stock.data.sectorRank === null ? "Unavailable" : `#${stock.data.sectorRank}`} />
+                    <Stat label="Sector rank" value={stock.data.sectorRank === null ? "—" : `#${stock.data.sectorRank}`} />
                   </>
                 ) : <CardSkeleton rows={6} />}
               </CardContent>
@@ -258,10 +294,10 @@ export default function StockDetail() {
                 <p className="md:col-span-2 lg:col-span-3 text-sm leading-relaxed text-muted-foreground">
                   {stock.data.description}
                 </p>
-                <Stat icon={Building2} label="Headquarters" value={stock.data.headquarters ?? "Unavailable"} />
-                <Stat icon={CalendarDays} label="Founded" value={stock.data.founded ?? "Unavailable"} />
-                <Stat icon={Users} label="Employees" value={stock.data.employees === null ? "Unavailable" : stock.data.employees.toLocaleString()} />
-                <Stat label="CEO" value={stock.data.ceo ?? "Unavailable"} />
+                <Stat icon={Building2} label="Headquarters" value={stock.data.headquarters ?? "—"} />
+                <Stat icon={CalendarDays} label="Founded" value={stock.data.founded ?? "—"} />
+                <Stat icon={Users} label="Employees" value={stock.data.employees === null ? "—" : stock.data.employees.toLocaleString()} />
+                <Stat label="CEO" value={stock.data.ceo ?? "—"} />
                 <Stat label="Industry" value={stock.data.industry} />
                 <Stat
                   icon={Globe}
@@ -271,7 +307,7 @@ export default function StockDetail() {
                       <a href={stock.data.website} className="text-cyan hover:text-cyan-300" target="_blank" rel="noreferrer">
                         {stock.data.website.replace(/^https?:\/\//, "")}
                       </a>
-                    ) : "Unavailable"
+                    ) : "—"
                   }
                 />
               </CardContent>
@@ -433,6 +469,13 @@ export default function StockDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <p className="rounded-lg border border-border/50 bg-surface-elevated/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+        <span className="font-semibold text-foreground">Disclaimer:</span> This platform provides AI-assisted market analysis for
+        educational and decision-support purposes only. It does not constitute financial advice. Investors should conduct their
+        own research or consult a licensed financial adviser before making investment decisions. AI signals are probabilistic
+        and do not guarantee future performance.
+      </p>
     </div>
   );
 }
@@ -485,5 +528,5 @@ function NewsCard({ item, marketFallback = false }: { item: NewsItem; marketFall
 }
 
 function formatNullable(value: number | null | undefined, fractionDigits = 2): string {
-  return value === null || value === undefined ? "Unavailable" : value.toFixed(fractionDigits);
+  return value === null || value === undefined ? "—" : value.toFixed(fractionDigits);
 }

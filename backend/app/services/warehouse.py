@@ -6,8 +6,21 @@ from datetime import datetime, timezone, timedelta
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
-from google.cloud import bigquery
-from google.oauth2 import service_account
+
+try:
+    from google.cloud import bigquery
+    from google.oauth2 import service_account
+    _GOOGLE_CLOUD_AVAILABLE = True
+except ImportError:
+    _GOOGLE_CLOUD_AVAILABLE = False
+
+    class _GCPStub:
+        """Stub so BigQueryAdapter class body parses when google-cloud is absent."""
+        def __getattr__(self, name):
+            return lambda *a, **kw: None
+
+    bigquery = _GCPStub()        # type: ignore[assignment]
+    service_account = _GCPStub()  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +46,11 @@ class WarehouseAdapter(ABC):
     @abstractmethod
     def write_news_sentiment(self, df: pd.DataFrame):
         """Save news sentiment data"""
+        pass
+
+    @abstractmethod
+    def write_news_articles(self, df: pd.DataFrame):
+        """Save raw news article history"""
         pass
 
     @abstractmethod
@@ -215,6 +233,10 @@ class PostgresAdapter(WarehouseAdapter):
             raise
         logger.info("Wrote %d rows to PostgreSQL news_sentiment table", n)
 
+    def write_news_articles(self, df: pd.DataFrame):
+        """Raw article history lives in BigQuery, not the serving Postgres store."""
+        logger.debug("Postgres: skipping write_news_articles (%d rows)", len(df))
+
     def write_daily_sentiment_summary(self, df: pd.DataFrame):
         """Insert daily sentiment summary into PostgreSQL"""
         rows = [
@@ -366,10 +388,25 @@ class BigQueryAdapter(WarehouseAdapter):
         bigquery.SchemaField("ingested_at", "TIMESTAMP"),
     ]
 
+    _NEWS_ARTICLES_SCHEMA = [
+        bigquery.SchemaField("published_date", "TIMESTAMP"),
+        bigquery.SchemaField("source", "STRING"),
+        bigquery.SchemaField("headline", "STRING"),
+        bigquery.SchemaField("article_text", "STRING"),
+        bigquery.SchemaField("url", "STRING"),
+        bigquery.SchemaField("mentioned_tickers", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("ingested_at", "TIMESTAMP"),
+    ]
+
     def __init__(self, project_id: str, raw_dataset: str = "ngx_raw_data",
                  market_dataset: str = "ngx_market_data",
                  credentials_path: str | None = None):
         """Connect to BigQuery with raw and market data datasets"""
+        if not _GOOGLE_CLOUD_AVAILABLE:
+            raise ImportError(
+                "google-cloud-bigquery is not installed. "
+                "Set DATA_WAREHOUSE_MODE=postgres to use Postgres only."
+            )
         if credentials_path and os.path.exists(credentials_path):
             creds = service_account.Credentials.from_service_account_file(
                 credentials_path
@@ -460,6 +497,41 @@ class BigQueryAdapter(WarehouseAdapter):
         table_id = f"{self.project_id}.{self.raw_dataset}.news_sentiment"
         self._load(df, table_id, "WRITE_APPEND")
 
+    def write_news_articles(self, df: pd.DataFrame):
+        table_id = f"{self.project_id}.{self.raw_dataset}.news_articles"
+        out = df[
+            [
+                "published_date", "source", "headline", "article_text",
+                "url", "mentioned_tickers",
+            ]
+        ].copy()
+        out["published_date"] = pd.to_datetime(
+            out["published_date"], errors="coerce", utc=True
+        )
+        out["mentioned_tickers"] = out["mentioned_tickers"].apply(
+            lambda value: value if isinstance(value, list) else []
+        )
+        out["ingested_at"] = _utcnow()
+        out = out.drop_duplicates(subset=["url"], keep="last")
+        self._load(out, table_id, "WRITE_APPEND", schema=self._NEWS_ARTICLES_SCHEMA)
+        self._dedupe_news_articles()
+
+    def _dedupe_news_articles(self):
+        tid = f"`{self.project_id}.{self.raw_dataset}.news_articles`"
+        self.client.query(f"""
+            CREATE OR REPLACE TABLE {tid}
+            PARTITION BY DATE(published_date)
+            CLUSTER BY source AS
+            SELECT * EXCEPT(rn) FROM (
+              SELECT *, ROW_NUMBER() OVER (
+                PARTITION BY url ORDER BY ingested_at DESC
+              ) AS rn
+              FROM {tid}
+            )
+            WHERE rn = 1
+        """).result()
+        logger.info("Deduped BigQuery news_articles (CTAS)")
+
     def write_daily_sentiment_summary(self, df: pd.DataFrame):
         table_id = f"{self.project_id}.{self.market_dataset}.daily_sentiment_summary"
         self._load(df, table_id, "WRITE_APPEND",
@@ -541,14 +613,17 @@ class HybridWarehouse:
         self.pg = pg_adapter
         logger.info("Hybrid warehouse initialized (PostgreSQL + BigQuery)")
 
-    def write_price(self, df: pd.DataFrame, replace: bool = False):
+    def write_price(self, df: pd.DataFrame, replace: bool = False, cutoff_date=None):
         logger.info("Writing price data to both warehouses (replace=%s)...", replace)
-        self.bq.write_price(df, replace=replace)
-        self.pg.write_price(df, replace=replace)
+        self.bq.write_price(df, replace=replace, cutoff_date=cutoff_date)
+        self.pg.write_price(df, replace=replace, cutoff_date=cutoff_date)
 
     def write_news_sentiment(self, df: pd.DataFrame):
         self.bq.write_news_sentiment(df)
         self.pg.write_news_sentiment(df)
+
+    def write_news_articles(self, df: pd.DataFrame):
+        self.bq.write_news_articles(df)
 
     def write_daily_sentiment_summary(self, df: pd.DataFrame):
         self.bq.write_daily_sentiment_summary(df)
@@ -578,10 +653,54 @@ class HybridWarehouse:
         return self.bq.get_last_dates()
 
 
+class NullWarehouse(WarehouseAdapter):
+    """No-op warehouse for local development — parquet files are the only store."""
+
+    def write_price(self, df: pd.DataFrame, replace: bool = False, **kwargs):
+        logger.debug("NullWarehouse: skipping write_price (%d rows)", len(df))
+
+    def write_news_sentiment(self, df: pd.DataFrame):
+        logger.debug("NullWarehouse: skipping write_news_sentiment (%d rows)", len(df))
+
+    def write_news_articles(self, df: pd.DataFrame):
+        logger.debug("NullWarehouse: skipping write_news_articles (%d rows)", len(df))
+
+    def write_daily_sentiment_summary(self, df: pd.DataFrame):
+        logger.debug("NullWarehouse: skipping write_daily_sentiment_summary (%d rows)", len(df))
+
+    def write_tickers(self, df: pd.DataFrame):
+        logger.debug("NullWarehouse: skipping write_tickers (%d rows)", len(df))
+
+    def write_pipeline_run(self, df: pd.DataFrame):
+        logger.debug("NullWarehouse: skipping write_pipeline_run")
+
+    def read_price(self, ticker: str = None, start_date: str = None):
+        return pd.DataFrame()
+
+    def get_last_dates(self) -> dict:
+        """Derive watermarks from local per-ticker parquet files."""
+        from pathlib import Path
+        price_dir = Path(os.getenv("DATA_OUTPUT_DIR", "data/output")) / "processed" / "prices" / "historical"
+        last_dates: dict = {}
+        if price_dir.exists():
+            for path in price_dir.glob("*.parquet"):
+                try:
+                    df = pd.read_parquet(path, columns=["date"])
+                    if not df.empty:
+                        last_dates[path.stem.upper()] = pd.to_datetime(df["date"]).max().date()
+                except Exception:
+                    pass
+        logger.info("NullWarehouse watermark: %d tickers from local parquets", len(last_dates))
+        return last_dates
+
+
 # create helper function
 def get_warehouse():
     """Initialize the right warehouse based on .env settings"""
     mode = os.getenv("DATA_WAREHOUSE_MODE", "hybrid")
+
+    if mode == "local":
+        return NullWarehouse()
 
     _pg_host = os.getenv("POSTGRES_HOST") or ""
     _pg_dsn = os.getenv("POSTGRES_URL")

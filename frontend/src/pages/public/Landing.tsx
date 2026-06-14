@@ -289,6 +289,15 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      <div className="px-4 pb-8 text-center lg:px-8">
+        <p className="mx-auto max-w-3xl text-[11px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold">Disclaimer:</span> This platform provides AI-assisted market analysis for educational
+          and decision-support purposes only. It does not constitute financial advice. Investors should conduct their own
+          research or consult a licensed financial adviser before making investment decisions. AI signals are probabilistic
+          and do not guarantee future performance.
+        </p>
+      </div>
     </div>
   );
 }
