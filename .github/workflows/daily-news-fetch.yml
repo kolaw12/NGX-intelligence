@@ -64,7 +64,7 @@ jobs:
         env:
           NEWS_SOURCES: ngx,businessday
           NEWS_MAX_ARTICLES: ${{ github.event.inputs.max_articles || '100' }}
-          NUPAT_DISABLE_FINBERT: '0'
+          NUPAT_DISABLE_FINBERT: '1'
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           GCP_CREDENTIALS_PATH: ${{ runner.temp }}/gcp-sa.json
           BIGQUERY_MARKET_DATASET: ${{ vars.BIGQUERY_MARKET_DATASET }}
