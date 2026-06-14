@@ -4,7 +4,7 @@ on:
   schedule:
     # Sunday 02:00 UTC — after the weekend, before Monday's market open
     - cron: "0 2 * * 0"
-  workflow_dispatch:    # manual trigger from the Actions tab
+  workflow_dispatch:
     inputs:
       min_auc:
         description: "Minimum AUC-ROC threshold (default 0.55)"
@@ -26,19 +26,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: requirements-daily.txt
+          cache-dependency-path: backend/requirements-daily.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-daily.txt
+        run: pip install -r backend/requirements-daily.txt
 
       - name: Retrain XGBoost model
+        working-directory: backend
         env:
           BROADSTREET_USERNAME: ${{ secrets.BROADSTREET_USERNAME }}
           BROADSTREET_PASSWORD: ${{ secrets.BROADSTREET_PASSWORD }}
@@ -55,6 +56,7 @@ jobs:
           python scripts/train_xgboost.py $ARGS
 
       - name: Export updated model snapshot
+        working-directory: backend
         run: python scripts/export_xgboost_snapshot.py
 
       - name: Refresh API cache
@@ -75,6 +77,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: retrain-metrics-${{ github.run_id }}
-          path: models/last_retrain_metrics.json
+          path: backend/models/last_retrain_metrics.json
           if-no-files-found: ignore
           retention-days: 90
