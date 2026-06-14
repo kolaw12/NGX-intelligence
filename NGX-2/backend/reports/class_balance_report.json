@@ -1,0 +1,30 @@
+{
+  "total_labeled_rows": 1125284,
+  "up_count": 166606,
+  "down_count": 958678,
+  "up_percentage": 14.81,
+  "down_percentage": 85.19,
+  "imbalance_ratio": 0.174,
+  "threshold_used": 0.005,
+  "note": "Label=1 if next-day return > 0.5%. Time-based split used during training.",
+  "lstm_quality": {
+    "passed": false,
+    "reason": "ROC-AUC 0.516 < threshold 0.55",
+    "metrics": {
+      "balanced_accuracy": 0.5122,
+      "mcc": 0.0243,
+      "roc_auc": 0.5162,
+      "predicted_up_pct": 51.54,
+      "actual_up_pct": 52.76
+    },
+    "requirements": {
+      "min_roc_auc": 0.55,
+      "min_balanced_accuracy": 0.55,
+      "min_mcc": 0.05,
+      "predicted_up_pct_range": [
+        20,
+        80
+      ]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+    "date": "2026-05-25",
+    "generated_at": "2026-05-25 13:47:11",
+    "total_articles": 21,
+    "stock_sentiments": [
+        {
+            "ticker": "FTN",
+            "sentiment_score": 0.6,
+            "signal": "POSITIVE",
+            "article_count": 1
+        },
+        {
+            "ticker": "LIV",
+            "sentiment_score": 0.6,
+            "signal": "POSITIVE",
+            "article_count": 1
+        },
+        {
+            "ticker": "ABL",
+            "sentiment_score": 0.6,
+            "signal": "POSITIVE",
+            "article_count": 1
+        }
+    ],
+    "market_sentiment": {
+        "score": 0.001,
+        "signal": "NEUTRAL",
+        "article_count": 19
+    },
+    "macro_indicators": {}
+}

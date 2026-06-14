@@ -1,0 +1,7 @@
+source_id,name,base_url,robots_url,scrape_method,priority,notes
+nairametrics,Nairametrics,https://nairametrics.com,https://nairametrics.com/robots.txt,requests,1,Most NGX-focused publication; clear ticker tagging
+ngx_announcements,NGX Official Announcements,https://ngxgroup.com,https://ngxgroup.com/robots.txt,requests,1,Primary source - companies required to disclose material events here
+businessday,BusinessDay Nigeria,https://businessday.ng,https://businessday.ng/robots.txt,requests,1,Major business daily; broad coverage
+proshare,Proshare Nigeria,https://proshareng.com,https://proshareng.com/robots.txt,requests,2,Investor-focused analysis
+premium_times,Premium Times,https://www.premiumtimesng.com,https://www.premiumtimesng.com/robots.txt,requests,3,General + business; investigations and scandals
+cbn,CBN Press Releases,https://www.cbn.gov.ng,,requests,3,Monetary policy news - moves the whole market

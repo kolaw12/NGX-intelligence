@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: fct_price_adjusted
+    description: >
+      Corporate-actions-adjusted OHLCV (splits + bonuses; cash dividends TODO).
+      One row per (date, ticker). adj_* columns are back-adjusted to today's
+      share basis; raw close/volume retained for reference. Identity for any
+      ticker with no actions in the seed.
+    columns:
+      - name: adj_factor
+        description: "Product of future split/bonus factors. 1.0 = unadjusted."
+        tests:
+          - not_null
+      - name: adj_close
+        description: "Split/bonus-adjusted close. Use this, not raw close, for returns."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date
+            - ticker
+      - dbt_utils.expression_is_true:
+          expression: "adj_factor > 0"
+      # Adjusted close should stay positive on real-trade days. WARN, not
+      # ERROR, because it inherits the documented historical corruption
+      # (2010-08-05 cluster) from the raw price source — KNOWN_ISSUES §11.
+      - dbt_utils.expression_is_true:
+          expression: "adj_close > 0"
+          config:
+            where: "volume > 0"
+            severity: warn
+
+  - name: fct_returns
+    description: >
+      Daily simple and log returns on adjusted close. The ML-facing returns
+      table. One row per (ticker, date) with a prior close.
+    columns:
+      - name: log_return
+        description: "ln(adj_close / prev_adj_close)."
+      - name: simple_return
+        description: "adj_close / prev_adj_close - 1."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date
+            - ticker
+      # Sanity bound: a >200% single-day move is almost certainly residual
+      # bad data, not a real NGX print (10% daily price limits typically).
+      # WARN so it surfaces without failing the build on illiquid edge cases.
+      - dbt_utils.expression_is_true:
+          expression: "abs(simple_return) <= 2.0"
+          config:
+            severity: warn
+
+  - name: ml_training_dataset
+    description: "Training dataset combining returns, sentiment, and labels for ML models"
+    columns:
+      - name: date
+        description: "Trading date"
+        tests:
+          - not_null
+      - name: ticker
+        description: "NGX ticker"
+        tests:
+          - not_null
+      - name: target_return
+        description: "Forward return used as regression label"
+        tests:
+          - not_null
+      - name: target_up
+        description: "Binary up/down target for classification"
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "{{ column_name }} IN (0,1)"
+      - name: avg_sentiment
+        description: "Average daily sentiment score"
+        
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date
+            - ticker
+      - dbt_utils.expression_is_true:
+          expression: "abs(avg_sentiment) <= 1.0"
+          config:
+            severity: warn

@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: ngx_market_data
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: "{{ env_var('BIGQUERY_MARKET_DATASET', 'ngx_market_data') }}"
+    description: "Raw NGX warehouse — source of truth, not mutated by dbt."
+    tables:
+      - name: price
+        description: "Daily OHLCV per ticker. Loaded by pipeline.daily() and pipeline.backfill()."
+        loaded_at_field: ingested_at
+        # NGX trades Mon-Fri after ~14:30 WAT close. The daily workflow lands
+        # new rows ~18:15 WAT (17:15 UTC). Thresholds are weekday-friendly:
+        #   warn at 30h  -> catches a quietly-skipped weekday run next morning
+        #   error at 80h -> tolerates Fri close + weekend + 1 holiday buffer
+        freshness:
+          warn_after:  { count: 30, period: hour }
+          error_after: { count: 80, period: hour }
+      - name: daily_sentiment_summary
+        description: "Daily aggregated sentiment metrics loaded from warehouse ingestion."
+        loaded_at_field: ingested_at

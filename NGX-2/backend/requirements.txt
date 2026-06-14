@@ -1,0 +1,4 @@
+# Safe default for hosted web services such as Render.
+# Full data/NLP development dependencies live in requirements-full.txt.
+
+-r requirements-web.txt

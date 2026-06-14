@@ -1,0 +1,49 @@
+# Minimal production dependencies for daily pipeline (GitHub Actions)
+# Excludes dev tools, ML packages, and web frameworks
+
+# Data fetching & HTTP
+requests>=2.34.0
+beautifulsoup4>=4.14.0
+lxml>=4.9.0
+curl_cffi>=0.15.0
+httpx>=0.28.0
+
+# Data processing
+pandas>=3.0.0
+numpy>=2.4.0
+pyarrow>=24.0.0
+python-dateutil>=2.9.0
+
+# Model snapshot export
+joblib>=1.4.0
+scikit-learn==1.6.1
+xgboost==3.2.0
+
+# Config & utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+click>=8.4.0
+colorama>=0.4.6
+
+# Logging
+loguru>=0.7.0
+
+# Reliability & retry
+tenacity>=8.2.0
+
+# Data Warehouse
+google-cloud-bigquery>=3.38.0,<4
+psycopg2-binary>=2.9.0
+db-dtypes>=1.1.0  # Required for BigQuery date/time type conversions
+
+# dbt for data quality testing
+dbt-core>=1.8.0,<2
+dbt-bigquery>=1.8.0,<2
+
+# Timezone support
+pytz>=2026.0
+
+# Supporting utilities
+platformdirs>=4.9.0
+Jinja2>=3.1.0
+MarkupSafe>=3.0.0

@@ -1,0 +1,48 @@
+version: 2
+
+seeds:
+  - name: corporate_actions
+    description: >
+      Hand-curated NGX corporate actions (splits, bonuses, cash dividends).
+      Source of truth for price adjustment. The shipped rows use the synthetic
+      ticker EXMPL purely to document the format and exercise the math — they
+      do NOT match any real price ticker, so they cannot corrupt real adjusted
+      prices. A domain expert populates real rows from NGX's public records;
+      adjustment then activates per ticker. fct_price_adjusted is correct (an
+      identity) for any ticker with no actions.
+    columns:
+      - name: ticker
+        description: "NGX/BroadStreet ticker the action applies to."
+        tests:
+          - not_null
+      - name: ex_date
+        description: "Ex-date: first trading day the price reflects the action."
+        tests:
+          - not_null
+      - name: action_type
+        description: "One of split | bonus | cash_dividend."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["split", "bonus", "cash_dividend"]
+      - name: ratio
+        description: >
+          split: new shares per old share (2-for-1 -> 2.0).
+          bonus: bonus shares per share held (1-for-10 -> 0.1).
+          cash_dividend: null.
+      - name: dividend
+        description: "cash_dividend: NGN per share. null for split/bonus."
+    tests:
+      # Splits and bonuses must carry a ratio; cash dividends must carry an amount.
+      - dbt_utils.expression_is_true:
+          expression: "ratio is not null"
+          config:
+            where: "action_type in ('split','bonus')"
+      - dbt_utils.expression_is_true:
+          expression: "dividend is not null"
+          config:
+            where: "action_type = 'cash_dividend'"
+      - dbt_utils.expression_is_true:
+          expression: "ratio > 0"
+          config:
+            where: "action_type = 'split'"

@@ -1,0 +1,553 @@
+{
+  "DANGCEM": {
+    "ticker": "DANGCEM",
+    "company_name": "Dangote Cement Plc",
+    "description": "Dangote Cement is the largest cement producer in sub-Saharan Africa by installed capacity. It operates integrated plants and grinding facilities across Nigeria and nine other African countries, with a combined installed capacity exceeding 51 million tonnes per annum.",
+    "business_model": "Manufactures and distributes cement through its own truck fleet and third-party logistics. Revenue is primarily domestic Nigeria sales (>60%) plus exports and sales from pan-African subsidiaries.",
+    "sector": "Building Materials",
+    "industry": "Cement & Construction Materials",
+    "founded": 1992,
+    "headquarters": "Lagos, Nigeria",
+    "employees": 16000,
+    "ceo": "Arvind Pathak",
+    "website": "https://www.dangcem.com",
+    "key_risks": [
+      "Energy cost exposure (gas/coal price volatility affects kiln operations)",
+      "Naira depreciation increases USD-denominated input costs",
+      "Construction sector cyclicality tied to government infrastructure spending",
+      "Competition from BUA Cement and LaFarge Africa in domestic market"
+    ]
+  },
+  "GTCO": {
+    "ticker": "GTCO",
+    "company_name": "Guaranty Trust Holding Company Plc",
+    "description": "GTCO is one of Nigeria's most profitable and best-capitalised financial services groups, operating through Guaranty Trust Bank (GTBank) across West and East Africa plus the UK. It also owns HabariPay (digital payments) and Squad (payment gateway).",
+    "business_model": "Diversified financial services: retail and corporate banking, digital payments, asset management, and pension administration. Strong low-cost deposit franchise with high CASA ratio.",
+    "sector": "Financial Services",
+    "industry": "Banking",
+    "founded": 1990,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 12000,
+    "ceo": "Segun Agbaje",
+    "website": "https://www.gtcoplc.com",
+    "key_risks": [
+      "NPL creep in SME and retail book during high-interest-rate cycle",
+      "Naira devaluation impact on foreign currency loan book",
+      "Regulatory capital adequacy requirements from CBN",
+      "Competition from fintechs eroding low-value transaction revenue"
+    ]
+  },
+  "ZENITHBANK": {
+    "ticker": "ZENITHBANK",
+    "company_name": "Zenith Bank Plc",
+    "description": "Zenith Bank is one of the largest Nigerian commercial banks by total assets and deposits, serving retail, SME, and corporate customers. It operates in Nigeria, Ghana, UK, and Sierra Leone.",
+    "business_model": "Corporate and retail banking with a large trade finance and treasury desk. Known for strong risk management and one of the highest capital adequacy ratios among Nigerian tier-1 banks.",
+    "sector": "Financial Services",
+    "industry": "Banking",
+    "founded": 1990,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 8000,
+    "ceo": "Adaora Umeoji",
+    "website": "https://www.zenithbank.com",
+    "key_risks": [
+      "Rising NPLs from oil and gas sector exposure",
+      "Naira volatility affecting dollar-denominated earnings repatriation",
+      "Cyber and technology risk as digital adoption accelerates",
+      "Interest rate risk on large fixed-income portfolio"
+    ]
+  },
+  "MTNN": {
+    "ticker": "MTNN",
+    "company_name": "MTN Nigeria Communications Plc",
+    "description": "MTN Nigeria is the country's largest mobile operator by subscribers and revenue, providing voice, data, digital financial services (MoMo PSB), and enterprise connectivity. It is a subsidiary of MTN Group (South Africa).",
+    "business_model": "Network operator monetising growing data and fintech revenue alongside traditional voice. MoMo Payment Service Bank is a regulated mobile money entity targeting financial inclusion.",
+    "sector": "Telecommunications",
+    "industry": "Mobile Telecoms",
+    "founded": 2001,
+    "headquarters": "Ikoyi, Lagos, Nigeria",
+    "employees": 4800,
+    "ceo": "Karl Toriola",
+    "website": "https://www.mtn.ng",
+    "key_risks": [
+      "Regulatory interventions (NCC tariff caps, SIM deactivations)",
+      "Naira depreciation directly inflates USD-denominated parent fees and debt service",
+      "Infrastructure sharing costs and diesel expense for off-grid towers",
+      "Competition from Airtel Africa and Glo in data and fintech"
+    ]
+  },
+  "AIRTELAFRI": {
+    "ticker": "AIRTELAFRI",
+    "company_name": "Airtel Africa Plc",
+    "description": "Airtel Africa is a London- and Lagos-listed pan-African telecom group with operations in 14 countries. Nigeria is its largest single market. It provides mobile voice, data, and Airtel Money mobile financial services.",
+    "business_model": "Operates as a wholesale-funded operator; monetises spectrum, tower infrastructure (via Infraco partnerships), and a fast-growing mobile money segment targeting unbanked populations.",
+    "sector": "Telecommunications",
+    "industry": "Mobile Telecoms",
+    "founded": 2010,
+    "headquarters": "London, UK (Nigeria HQ: Lagos)",
+    "employees": 4000,
+    "ceo": "Sunil Taldar",
+    "website": "https://www.airtelafrica.com",
+    "key_risks": [
+      "Multi-currency earnings conversion risk across 14 markets",
+      "Regulatory NCC tariff constraints in Nigeria",
+      "Competition from MTN Nigeria in data and mobile money",
+      "Liquidity risk from USD repatriation restrictions"
+    ]
+  },
+  "ACCESSCORP": {
+    "ticker": "ACCESSCORP",
+    "company_name": "Access Holdings Plc",
+    "description": "Access Holdings (formerly Access Bank) is one of Africa's largest financial institutions by assets, with operations in over 20 countries. Its banking subsidiary Access Bank is Nigeria's largest by customer base following the Diamond Bank merger.",
+    "business_model": "Holding company structure covering commercial banking, insurance, asset management, and payments. Retail-first strategy with a large branch and digital presence.",
+    "sector": "Financial Services",
+    "industry": "Banking",
+    "founded": 1989,
+    "headquarters": "Lagos, Nigeria",
+    "employees": 28000,
+    "ceo": "Roosevelt Ogbonna",
+    "website": "https://www.accessholdings.com",
+    "key_risks": [
+      "Integration risk from rapid M&A expansion across Africa",
+      "High loan-to-deposit ratio increases funding cost sensitivity",
+      "FX translation losses from diverse African currency exposures",
+      "Regulatory capital pressure from CBN recapitalisation directive"
+    ]
+  },
+  "BUACEMENT": {
+    "ticker": "BUACEMENT",
+    "company_name": "BUA Cement Plc",
+    "description": "BUA Cement is Nigeria's second-largest cement company by installed capacity, operating plants in Sokoto and Obu (Edo State) with a combined capacity of 11 million tonnes per annum.",
+    "business_model": "Integrated cement manufacturer selling through distributor networks in northern and southern Nigeria. Lower transport costs from proximity to key regional markets give it a pricing advantage.",
+    "sector": "Building Materials",
+    "industry": "Cement & Construction Materials",
+    "founded": 2008,
+    "headquarters": "Abuja, Nigeria",
+    "employees": 5000,
+    "ceo": "Yusuf Binji",
+    "website": "https://www.buacement.com",
+    "key_risks": [
+      "Energy costs (gas and coal) are the largest variable cost",
+      "Pricing competition from Dangote Cement in overlapping markets",
+      "Logistics disruptions from road and rail infrastructure deficits",
+      "Exchange rate exposure on imported clinker and spare parts"
+    ]
+  },
+  "BUAFOODS": {
+    "ticker": "BUAFOODS",
+    "company_name": "BUA Foods Plc",
+    "description": "BUA Foods is one of Nigeria's largest integrated food companies, producing sugar, flour, pasta, and edible oils. Its Lafiagi and Sunti Golden Sugar Estates are among the largest sugar cane estates in Africa.",
+    "business_model": "Vertically integrated from farming to branded consumer goods distribution. Sugar refining is the dominant revenue segment, supplemented by pasta and flour milling.",
+    "sector": "Consumer Goods",
+    "industry": "Food Manufacturing",
+    "founded": 2021,
+    "headquarters": "Abuja, Nigeria",
+    "employees": 6000,
+    "ceo": "Ayodele Abioye",
+    "website": "https://www.buafoods.com",
+    "key_risks": [
+      "Sugar import duty and backward integration levy policy changes",
+      "Naira devaluation increases cost of imported raw materials",
+      "Agri-business exposure to climate risk (flooding at sugarcane estates)",
+      "Competition from imported sugar and Dangote Sugar Refinery"
+    ]
+  },
+  "NESTLE": {
+    "ticker": "NESTLE",
+    "company_name": "Nestlé Nigeria Plc",
+    "description": "Nestlé Nigeria manufactures and markets food and beverage products including Milo, Maggi, Nestlé Pure Life, Kit Kat, and Nescafé. It is a subsidiary of Nestlé S.A. (Switzerland).",
+    "business_model": "Consumer branded goods with strong retail distribution network. Leverages the global Nestlé supply chain for inputs while manufacturing locally.",
+    "sector": "Consumer Goods",
+    "industry": "Food & Beverages",
+    "founded": 1961,
+    "headquarters": "Ilupeju, Lagos, Nigeria",
+    "employees": 2800,
+    "ceo": "Wassim Elhusseini",
+    "website": "https://www.nestle-cwa.com/en/ng",
+    "key_risks": [
+      "Imported raw material costs amplified by Naira weakness",
+      "Consumer purchasing power erosion reduces volumes in mass-market tiers",
+      "FX repatriation difficulty for dividend remittances to Nestlé S.A.",
+      "Distribution cost inflation from high diesel prices"
+    ]
+  },
+  "SEPLAT": {
+    "ticker": "SEPLAT",
+    "company_name": "Seplat Energy Plc",
+    "description": "Seplat Energy is a leading independent Nigerian oil and gas company listed on both the NGX and London Stock Exchange. It operates onshore and shallow water assets in the Niger Delta.",
+    "business_model": "Upstream oil and gas production with growing gas-to-power supply contribution. Completed acquisition of ExxonMobil's MPNU shallow-water assets in 2024.",
+    "sector": "Oil & Gas",
+    "industry": "Upstream Oil & Gas",
+    "founded": 2009,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 1800,
+    "ceo": "Roger Brown",
+    "website": "https://www.seplatenergy.com",
+    "key_risks": [
+      "Oil theft and pipeline vandalism in Niger Delta",
+      "Brent crude price volatility directly impacts earnings",
+      "MPNU integration execution risk",
+      "Regulatory delays from Nigerian Upstream Petroleum Regulatory Commission"
+    ]
+  },
+  "FBNH": {
+    "ticker": "FBNH",
+    "company_name": "FBN Holdings Plc",
+    "description": "FBN Holdings is the parent of First Bank of Nigeria, the country's oldest bank founded in 1894. The group also operates FBNQuest (investment banking), FBNInsurance, and other financial subsidiaries.",
+    "business_model": "Universal banking group with the widest branch network in Nigeria. Shifting focus toward retail digital banking and SME lending after a period of NPL clean-up.",
+    "sector": "Financial Services",
+    "industry": "Banking",
+    "founded": 1894,
+    "headquarters": "Marina, Lagos, Nigeria",
+    "employees": 14000,
+    "ceo": "Nnamdi Okonkwo",
+    "website": "https://www.fbnholdings.com",
+    "key_risks": [
+      "Legacy NPL portfolio from oil and gas exposures",
+      "Technology modernisation spend pressuring costs",
+      "Competition from tier-1 peers and fintechs in retail deposits",
+      "Governance risk given historical CBN intervention"
+    ]
+  },
+  "STANBIC": {
+    "ticker": "STANBIC",
+    "company_name": "Stanbic IBTC Holdings Plc",
+    "description": "Stanbic IBTC is a diversified financial services group and subsidiary of Standard Bank Group (South Africa). It operates across banking, stockbroking, insurance, asset management, and pension administration in Nigeria.",
+    "business_model": "Wealth and investment-led financial services with deep corporate banking relationships. Pension fund administration (one of Nigeria's largest PFAs) provides recurring annuity revenue.",
+    "sector": "Financial Services",
+    "industry": "Diversified Financial Services",
+    "founded": 1989,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 5000,
+    "ceo": "Wole Adeniyi",
+    "website": "https://www.stanbicibtc.com",
+    "key_risks": [
+      "Equity market volatility affects asset management AUM and fees",
+      "Pension regulatory changes from National Pension Commission",
+      "FX translation risk on Standard Bank Group consolidation",
+      "Capital market slowdowns reduce investment banking revenue"
+    ]
+  },
+  "GEREGU": {
+    "ticker": "GEREGU",
+    "company_name": "Geregu Power Plc",
+    "description": "Geregu Power owns and operates the Geregu gas-fired power plant (414 MW installed capacity) in Kogi State, one of the largest independent power producers in Nigeria.",
+    "business_model": "Sells electricity to the Nigerian Bulk Electricity Trading company (NBET) under power purchase agreements. Gas supply from the NGC pipeline.",
+    "sector": "Utilities",
+    "industry": "Power Generation",
+    "founded": 2013,
+    "headquarters": "Ajaokuta, Kogi State, Nigeria",
+    "employees": 400,
+    "ceo": "Rotimi Amaechi (Chairman), Femi Otedola (Chairman Emeritus)",
+    "website": "https://www.geregupower.com",
+    "key_risks": [
+      "Gas supply curtailments reduce actual generation capacity factor",
+      "NBET payment delays create receivables risk",
+      "Grid infrastructure constraints limit dispatch capacity",
+      "Regulatory tariff decisions affect revenue per kWh"
+    ]
+  },
+  "NB": {
+    "ticker": "NB",
+    "company_name": "Nigerian Breweries Plc",
+    "description": "Nigerian Breweries is the largest brewer in Nigeria and a subsidiary of Heineken N.V. It produces Star, Heineken, Gulder, Maltina, and Amstel Malta, among others.",
+    "business_model": "Mass-market and premium beer, stout, and malt beverage manufacturer with a national distribution network. Revenue splits roughly 70% lager, 30% stout and non-alcoholic.",
+    "sector": "Consumer Goods",
+    "industry": "Beverages — Breweries",
+    "founded": 1946,
+    "headquarters": "Iganmu, Lagos, Nigeria",
+    "employees": 3500,
+    "ceo": "Hans Essaadi",
+    "website": "https://www.nbplc.com",
+    "key_risks": [
+      "Excise duty increases raise cost of goods sold",
+      "Imported raw materials (barley, hops) exposed to Naira weakness",
+      "Consumer trade-down to cheaper unregulated local brews",
+      "Competition from Guinness Nigeria and international brands"
+    ]
+  },
+  "UBA": {
+    "ticker": "UBA",
+    "company_name": "United Bank for Africa Plc",
+    "description": "UBA is a pan-African financial institution operating in 20 African countries plus the US, UK, and France. It serves over 35 million customers with a diversified product suite.",
+    "business_model": "Pan-African retail and corporate banking with significant non-Nigeria revenue (over 40% of group profit). Known for strong trade finance and correspondent banking franchise.",
+    "sector": "Financial Services",
+    "industry": "Banking",
+    "founded": 1949,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 20000,
+    "ceo": "Oliver Alawuba",
+    "website": "https://www.ubagroup.com",
+    "key_risks": [
+      "Multi-currency translation risk across 20 African markets",
+      "Credit quality in high-inflation markets across the continent",
+      "Nigeria CBN recapitalisation directive capital raise requirement",
+      "Reputational and operational risk from diverse market regulatory regimes"
+    ]
+  },
+  "FIDELITYBK": {
+    "ticker": "FIDELITYBK",
+    "company_name": "Fidelity Bank Plc",
+    "description": "Fidelity Bank is a mid-tier Nigerian commercial bank focused on SME, retail, and corporate banking. It completed a rights issue and is pursuing a merger with Union Bank to create a larger tier-2 institution.",
+    "business_model": "Retail-focused banking with a strong digital banking push. SME lending is a key differentiator alongside a growing savings mobilisation campaign.",
+    "sector": "Financial Services",
+    "industry": "Banking",
+    "founded": 1988,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 5000,
+    "ceo": "Nneka Onyeali-Ikpe",
+    "website": "https://www.fidelitybank.ng",
+    "key_risks": [
+      "Capital adequacy ratio pressure under CBN recapitalisation requirements",
+      "Union Bank merger execution risk",
+      "Higher funding costs in a tight liquidity environment",
+      "SME segment NPL risk during economic slowdown"
+    ]
+  },
+  "WAPCO": {
+    "ticker": "WAPCO",
+    "company_name": "Lafarge Africa Plc",
+    "description": "Lafarge Africa (formerly West African Portland Cement) is a cement and aggregates company operating plants in Lagos, Ewekoro (Ogun State), and Mbenga. It is a subsidiary of Holcim Group (Switzerland).",
+    "business_model": "Cement manufacturer focused on southern Nigerian markets. Also supplies building solutions including mortar and aggregates under the Holcim brand umbrella.",
+    "sector": "Building Materials",
+    "industry": "Cement & Construction Materials",
+    "founded": 1959,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 2500,
+    "ceo": "Khaled El Dokani",
+    "website": "https://www.lafriquecement.com",
+    "key_risks": [
+      "Energy cost inflation (coal, gas, diesel) compresses margins",
+      "Competition from Dangote Cement and BUA Cement in overlapping regions",
+      "Naira weakness increases cost of imported clinker and spare parts",
+      "Construction sector cyclicality"
+    ]
+  },
+  "OANDO": {
+    "ticker": "OANDO",
+    "company_name": "Oando Plc",
+    "description": "Oando is a Nigerian integrated energy company with upstream oil and gas production, energy distribution (through OVH Energy/Oando Marketing), and downstream petroleum services.",
+    "business_model": "Diversified across E&P, midstream, and downstream. Upstream assets concentrate on the Niger Delta. Downstream includes petroleum product distribution and LPG.",
+    "sector": "Oil & Gas",
+    "industry": "Integrated Oil & Gas",
+    "founded": 1956,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 2000,
+    "ceo": "Adewale Tinubu",
+    "website": "https://www.oandoplc.com",
+    "key_risks": [
+      "Oil production volume is highly sensitive to pipeline and bunkering disruptions",
+      "Significant legacy debt and leverage on the balance sheet",
+      "Regulatory history with SEC Nigeria and NUPRC",
+      "Downstream margins squeezed by government pricing subsidies"
+    ]
+  },
+  "TRANSCORP": {
+    "ticker": "TRANSCORP",
+    "company_name": "Transnational Corporation Plc (Transcorp)",
+    "description": "Transcorp is a diversified conglomerate with interests in power generation (Transcorp Power — Ughelli gas plant, 972 MW), hospitality (Transcorp Hilton Abuja), and oil & gas exploration.",
+    "business_model": "Conglomerate holding company. Power is the core value driver through Transcorp Power's electricity sales to NBET. Hospitality provides steady cash flow. Oil exploration is early-stage.",
+    "sector": "Conglomerates",
+    "industry": "Diversified — Power, Hospitality, Oil & Gas",
+    "founded": 2004,
+    "headquarters": "Abuja, Nigeria",
+    "employees": 3000,
+    "ceo": "Owen Omogiafo",
+    "website": "https://transcorpplc.com",
+    "key_risks": [
+      "NBET collection delays constrain power segment cash flows",
+      "Gas supply volume and pressure variability affects generation capacity",
+      "Hotel occupancy sensitive to government/corporate travel spend",
+      "Power sector regulatory tariff risk"
+    ]
+  },
+  "FLOURMILL": {
+    "ticker": "FLOURMILL",
+    "company_name": "Flour Mills of Nigeria Plc",
+    "description": "Flour Mills of Nigeria is the country's largest food company, manufacturing wheat flour, pasta, noodles, sugar, animal feeds, fertiliser, and packaging materials. Brands include Golden Penny and Bagco.",
+    "business_model": "Vertically integrated food conglomerate from port grain handling through milling, processing, distribution, and retail. Sugar and agro-allied segments diversify the wheat-focused core.",
+    "sector": "Consumer Goods",
+    "industry": "Food Manufacturing",
+    "founded": 1960,
+    "headquarters": "Apapa, Lagos, Nigeria",
+    "employees": 10000,
+    "ceo": "Omoboyede Olusanya",
+    "website": "https://www.flourmillsofnigeria.com",
+    "key_risks": [
+      "Wheat import dependency — Naira devaluation directly inflates raw material costs",
+      "Thin consumer goods margins amplify energy and logistics cost increases",
+      "Competition from Dangote Flour, BUA Foods, and imports",
+      "Working capital intensity from large grain inventory requirements"
+    ]
+  },
+  "PRESCO": {
+    "ticker": "PRESCO",
+    "company_name": "Presco Plc",
+    "description": "Presco is an integrated palm oil company with over 22,000 hectares of oil palm plantations in Edo and Delta states. It refines crude palm oil into edible oils, soaps, and oleochemicals.",
+    "business_model": "Plantation-to-refinery integration provides margin stability. Sells refined palm oil to food manufacturers and household consumers. Exports a portion of output.",
+    "sector": "Agriculture",
+    "industry": "Palm Oil Agri-business",
+    "founded": 1991,
+    "headquarters": "Obiaruku, Delta State, Nigeria",
+    "employees": 3500,
+    "ceo": "Felix Nwabuko",
+    "website": "https://www.prescoplc.com",
+    "key_risks": [
+      "Global CPO price cycles (linked to Malaysian and Indonesian production)",
+      "Climate and disease risk on plantation yields",
+      "Export restrictions and domestic supply obligations by government",
+      "Land rights and community relations in plantation areas"
+    ]
+  },
+  "OKOMUOIL": {
+    "ticker": "OKOMUOIL",
+    "company_name": "Okomu Oil Palm Company Plc",
+    "description": "Okomu Oil Palm is an agri-business growing oil palms and rubber in Edo State with over 30,000 hectares. A subsidiary of Socfin Group (Belgium/Luxembourg), it is one of the most consistently profitable companies on the NGX.",
+    "business_model": "Integrated plantation company selling crude palm oil (CPO), rubber, and some refined products. Low-cost advantage from large, young, high-yielding plantation base.",
+    "sector": "Agriculture",
+    "industry": "Palm Oil Agri-business",
+    "founded": 1976,
+    "headquarters": "Udo, Edo State, Nigeria",
+    "employees": 4000,
+    "ceo": "Graham Heifer",
+    "website": "https://www.okomuoil.com",
+    "key_risks": [
+      "CPO price swings driven by global vegetable oil supply/demand",
+      "Security risk in Edo State affecting plantation operations",
+      "Export duty changes and domestic supply directives",
+      "Rubber price cycle exposure"
+    ]
+  },
+  "GUINNESS": {
+    "ticker": "GUINNESS",
+    "company_name": "Guinness Nigeria Plc",
+    "description": "Guinness Nigeria is a subsidiary of Diageo Plc (UK), producing and distributing Guinness Stout, Harp, Malta Guinness, Smirnoff Ice, and other beverage brands in Nigeria.",
+    "business_model": "Premium and mainstream alcoholic and non-alcoholic beverage manufacturer. Significant revenue from the Guinness brand stout segment and growing RTD spirits.",
+    "sector": "Consumer Goods",
+    "industry": "Beverages — Breweries",
+    "founded": 1962,
+    "headquarters": "Ikeja, Lagos, Nigeria",
+    "employees": 1800,
+    "ceo": "John Musunga",
+    "website": "https://www.guinnessnigeria.com",
+    "key_risks": [
+      "Imported raw material costs (barley, hops) sensitive to Naira rate",
+      "Excise duty and tax policy risk on alcoholic beverages",
+      "Competition from Nigerian Breweries and informal spirits",
+      "Profitability pressure from utility and diesel costs"
+    ]
+  },
+  "INTBREW": {
+    "ticker": "INTBREW",
+    "company_name": "International Breweries Plc",
+    "description": "International Breweries is a subsidiary of AB InBev (Belgium) operating breweries in Ilesa, Onitsha, and Sagamu. Brands include Trophy, Hero, Castle Lite, Budweiser, and Eagle.",
+    "business_model": "Value beer strategy targeting mass-market consumers across southern and eastern Nigeria with regional brands. Leverages AB InBev global procurement for cost savings.",
+    "sector": "Consumer Goods",
+    "industry": "Beverages — Breweries",
+    "founded": 1971,
+    "headquarters": "Ilesa, Osun State, Nigeria",
+    "employees": 2200,
+    "ceo": "Jean-Louis Delattre",
+    "website": "https://www.intbreweriesplc.com",
+    "key_risks": [
+      "Long period of losses — capital erosion risk on balance sheet",
+      "FX impact on imported inputs and intercompany royalties to AB InBev",
+      "Consumer down-trading threatening even value-tier positioning",
+      "Competition from Nigerian Breweries' value segment brands"
+    ]
+  },
+  "CADBURY": {
+    "ticker": "CADBURY",
+    "company_name": "Cadbury Nigeria Plc",
+    "description": "Cadbury Nigeria manufactures and markets confectionery and beverages including Tom Tom, Buttermint, Trebor, and Bournvita. It is a subsidiary of Mondelēz International.",
+    "business_model": "Branded consumer goods company focused on confectionery and cocoa-based beverages. Distribution through modern trade, general trade, and key accounts.",
+    "sector": "Consumer Goods",
+    "industry": "Food & Beverages",
+    "founded": 1965,
+    "headquarters": "Ikeja, Lagos, Nigeria",
+    "employees": 1200,
+    "ceo": "Oyeyimika Adeboye",
+    "website": "https://www.cadburynigeria.com",
+    "key_risks": [
+      "Cocoa and sugar input costs volatile and largely USD-denominated",
+      "Consumer purchasing power erosion reduces discretionary confectionery spend",
+      "Competition from low-cost local and imported confectionery",
+      "Royalty and management fee outflows to parent Mondelēz"
+    ]
+  },
+  "UNILEVER": {
+    "ticker": "UNILEVER",
+    "company_name": "Unilever Nigeria Plc",
+    "description": "Unilever Nigeria manufactures and markets home care and personal care brands including Omo, Sunlight, Lipton, Close Up, and Vaseline. A subsidiary of Unilever Plc (UK/Netherlands).",
+    "business_model": "Branded FMCG manufacturer relying on mass retail and traditional trade channels. Pivoted to focus on homecare after divesting some food brands.",
+    "sector": "Consumer Goods",
+    "industry": "Personal & Home Care Products",
+    "founded": 1923,
+    "headquarters": "Oregun, Lagos, Nigeria",
+    "employees": 1600,
+    "ceo": "Carl Cruz",
+    "website": "https://www.unilever.com.ng",
+    "key_risks": [
+      "Import dependence for raw materials amplifies currency risk",
+      "Sustained profitability recovery following years of FX headwinds",
+      "Competition from regional and local home care brands",
+      "Dividend remittance restrictions to UK parent"
+    ]
+  },
+  "TOTAL": {
+    "ticker": "TOTAL",
+    "company_name": "TotalEnergies Marketing Nigeria Plc",
+    "description": "TotalEnergies Marketing Nigeria operates a network of fuel retail stations across Nigeria along with lubricant blending and aviation fuel services. A subsidiary of TotalEnergies SE (France).",
+    "business_model": "Downstream petroleum product marketing — fuel stations, lubricants, and specialty products. Shifting toward lower-carbon energy offerings aligned with global TotalEnergies strategy.",
+    "sector": "Oil & Gas",
+    "industry": "Downstream Petroleum",
+    "founded": 1956,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 800,
+    "ceo": "Jean-Luc Guiziou",
+    "website": "https://totalenergies.com.ng",
+    "key_risks": [
+      "Petroleum product pricing deregulation exposure post-subsidy removal",
+      "Competition from independent filling stations on thin retail margins",
+      "Working capital risk from product supply and PPMC allocation constraints",
+      "Forex risk on imported petroleum product payments"
+    ]
+  },
+  "CONOIL": {
+    "ticker": "CONOIL",
+    "company_name": "Conoil Plc",
+    "description": "Conoil is an independent Nigerian downstream petroleum company operating fuel retail stations and lubricant blending plants under the Conoil brand.",
+    "business_model": "Petroleum product marketing and lubricant manufacturing. Revenue from fuel retail, lubricants, and liquefied petroleum gas distribution.",
+    "sector": "Oil & Gas",
+    "industry": "Downstream Petroleum",
+    "founded": 1965,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 1000,
+    "ceo": "Olayemi Cardoso",
+    "website": "https://www.conoilnig.com",
+    "key_risks": [
+      "Downstream deregulation requires rapid pricing and logistics adaptation",
+      "Thin margins in a competitive fuel retail market",
+      "Supply chain disruptions from NNPC and private importers",
+      "Naira depreciation inflates imported lubricant base oil costs"
+    ]
+  },
+  "CUSTODIAN": {
+    "ticker": "CUSTODIAN",
+    "company_name": "Custodian Investment Plc",
+    "description": "Custodian Investment is a diversified financial services holding company with subsidiaries in general insurance (Custodian and Allied Insurance), life insurance, and pension fund administration.",
+    "business_model": "Insurance and pension business generating premium income and long-duration investment returns on the float. Pension AUM provides stable fee income.",
+    "sector": "Financial Services",
+    "industry": "Insurance & Pensions",
+    "founded": 1991,
+    "headquarters": "Victoria Island, Lagos, Nigeria",
+    "employees": 800,
+    "ceo": "Wole Oshin",
+    "website": "https://www.custodian-plc.com",
+    "key_risks": [
+      "Equity market falls reduce investment portfolio value on float",
+      "Claims inflation in motor and oil & gas insurance lines",
+      "Regulatory capital adequacy requirements from NAICOM",
+      "Competition from larger underwriters on commercial lines"
+    ]
+  }
+}

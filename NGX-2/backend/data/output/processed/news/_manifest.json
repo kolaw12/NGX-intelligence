@@ -1,0 +1,11 @@
+{
+  "stage": "news_ingestion",
+  "status": "not_started",
+  "sources": {
+    "nairametrics": {"status": "not_started", "articles": 0, "last_run": null},
+    "ngx_announcements": {"status": "not_started", "articles": 0, "last_run": null},
+    "businessday": {"status": "not_started", "articles": 0, "last_run": null},
+    "proshare": {"status": "not_started", "articles": 0, "last_run": null}
+  },
+  "note": "This file is overwritten by each fetcher run. Schema may evolve as the news pipeline matures."
+}

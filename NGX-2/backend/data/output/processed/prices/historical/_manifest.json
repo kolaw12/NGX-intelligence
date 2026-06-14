@@ -1,0 +1,37 @@
+{
+  "stage": "backfill",
+  "status": "ok",
+  "completed_at": "2026-05-15T20:50:49.066096+00:00",
+  "elapsed_seconds": 852.4,
+  "tickers_complete": 4,
+  "tickers_partial": 0,
+  "tickers_skipped": 269,
+  "tickers_failed": 19,
+  "requests_made": 262,
+  "tickers": {
+    "WEM": {
+      "rows": 8327,
+      "first_date": "1993-01-05",
+      "last_date": "2026-05-15",
+      "status": "complete"
+    },
+    "WTN": {
+      "rows": 5443,
+      "first_date": "1993-09-23",
+      "last_date": "2015-05-25",
+      "status": "complete"
+    },
+    "ZAI": {
+      "rows": 57,
+      "first_date": "2026-02-19",
+      "last_date": "2026-05-15",
+      "status": "complete"
+    },
+    "ZEN": {
+      "rows": 5335,
+      "first_date": "2004-10-21",
+      "last_date": "2026-05-15",
+      "status": "complete"
+    }
+  }
+}

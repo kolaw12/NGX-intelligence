@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: stg_price
+    description: "Quality-gated staging view of NGX OHLCV. Read this, not the raw source."
+    columns:
+      - name: date
+        description: "Trading date (NGX calendar)."
+        tests:
+          - not_null
+      - name: ticker
+        description: "NGX ticker symbol."
+        tests:
+          - not_null
+      - name: close
+        description: "Closing price in NGN."
+        tests:
+          - not_null
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date
+            - ticker
+
+      # Physical-sanity assertions — only meaningful on days with actual
+      # trading. No-trade days legitimately appear with volume=0 and
+      # zero/NULL high/low/close per the upstream source (HANDOFF.md §9).
+      #
+      # WARN severity (not ERROR): 0.58% of historical rows are corrupt at
+      # the source — dominated by 2010-08-05 (mass restatement day, pclose<0
+      # impossible) and delisted UT* tickers. Failing the daily over
+      # immutable historical garbage is the wrong call; we surface as
+      # warnings until those rows are either cleaned out or the parser
+      # rejects them upstream. Tracked separately as a parser/data-cleanup
+      # follow-up (likely paired with corporate-actions ingestion).
+      - dbt_utils.expression_is_true:
+          expression: "high >= low"
+          config:
+            where: "volume > 0"
+            severity: warn
+      - dbt_utils.expression_is_true:
+          expression: "high >= close"
+          config:
+            where: "volume > 0"
+            severity: warn
+      - dbt_utils.expression_is_true:
+          expression: "close > 0"
+          config:
+            where: "volume > 0"
+            severity: warn
+
+      # Volume itself can be 0 (no-trade day) or NULL (rare parser gap)
+      # but must never be negative. 11 known violators historically (same
+      # 2010-08-05 cluster) — warn until cleaned.
+      - dbt_utils.expression_is_true:
+          expression: "volume >= 0 OR volume IS NULL"
+          config:
+            severity: warn
+
+      - dbt_utils.expression_is_true:
+          expression: "date <= current_date()"
+
+  - name: stg_corporate_actions
+    description: >
+      Real corporate actions (EXMPL documentation rows excluded). Drives
+      price adjustment in fct_price_adjusted. Empty until a domain expert
+      seeds real rows — that's fine; adjustment is then an identity.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - ticker
+            - ex_date
+            - action_type

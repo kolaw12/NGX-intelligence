@@ -1,0 +1,70 @@
+services:
+  - type: web
+    name: ngx-intelligence-api
+    runtime: python
+    rootDir: .
+    buildCommand: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: FRONTEND_URL
+        sync: false
+      - key: NUPAT_DISABLE_FINBERT
+        value: "1"
+      - key: AUTO_CREATE_TABLES
+        value: "1"
+      - key: WARMUP_XGBOOST
+        value: "0"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      # Email alert delivery (set these in the Render dashboard)
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ngx-intelligence-db
+          property: connectionString
+
+  - type: static
+    name: ngx-intelligence-web
+    rootDir: ../frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Set this to your ngx-intelligence-api Render URL, e.g.:
+      # https://ngx-intelligence-api.onrender.com/api/v1
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_USE_MOCK
+        value: "false"
+
+databases:
+  - name: ngx-intelligence-db
+    databaseName: ngx_ai
+    user: ngx_ai
